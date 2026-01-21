@@ -1,0 +1,5 @@
+# LLM密钥
+OPENAI_API_KEY=your_openai_api_key
+
+# Embedding秘钥
+EMBEDDING_API_KEY=your_embedding_api_key
