@@ -8,6 +8,7 @@ load_dotenv()
 # 2. 获取API_KEYS
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 EMBEDDING_API_KEY = os.getenv("EMBEDDING_API_KEY")
+LANGCHAIN_API_KEY = os.getenv("LANGCHAIN_API_KEY")
 
 
 # 3.加载embedding模式

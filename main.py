@@ -32,8 +32,15 @@ from langgraph.graph import StateGraph, MessagesState, START, END
 from langgraph.prebuilt import ToolNode
 from loguru import logger
 
-from config import OPENAI_API_KEY
+from config import OPENAI_API_KEY,LANGCHAIN_API_KEY
 from tools.stream import run_agent_with_streaming
+
+os.environ["LANGCHAIN_TRACING_V2"] = "true" # 总开关，决定启用追踪功能
+os.environ["LANGCHAIN_PROJECT"] = "research-agent" # 自定义项目名
+os.environ["LANGCHAIN_API_KEY"] = LANGCHAIN_API_KEY
+
+
+
 
 # [新增 2] 初始化 RAG (单例模式)
 # 这一步会加载 rag_store.py 里的配置 (本地/云端)
@@ -80,7 +87,7 @@ async def processor_node(state: MessagesState):
     if isinstance(last_msg, ToolMessage) and last_msg.name in ["get_page_content", "batch_fetch"]:
         target_id = last_msg.tool_call_id
 
-        # 2. 往回找 AI 的原始指令 (寻找匹配该 ID 的 tool_calls)
+        # 2. 往回找 AI 的原始指令 (寻找匹配该 ID 的 tool_calls) - 具体数据无序且混乱，输出流程并非线性的结构，如果不用id显式指定，根本无法保证url获取的准确性
         source_url = "未知来源"
         for msg in reversed(messages):
             if hasattr(msg, "tool_calls") and msg.tool_calls:
@@ -109,7 +116,7 @@ async def processor_node(state: MessagesState):
         final_text = '\n'.join(filtered_lines)
 
         # 4. 物理入库 (离线模块)
-        rag.add_documents(str(last_msg.content), source_url=source_url)
+        rag.add_documents(final_text, source_url=source_url)
 
         # 5. 构造极其简单的通知
         new_msg = ToolMessage(
@@ -167,7 +174,6 @@ def build_graph(available_tools):
         [1] https: // example.com / paper_details - xx年x应用行情主线深度分析报告
         [2] https: // news.tech / report-2026
         """
-
     )
 
     # 绑定合并后的工具列表
