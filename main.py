@@ -2,6 +2,13 @@ import asyncio
 import json
 
 import logging  # <--- 记得导入 logging
+import os
+import re
+import shutil
+
+from datetime import datetime
+
+
 
 # --- 消音代码 --- 等级低于Warning的提示全部屏蔽
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -59,46 +66,63 @@ def search_knowledge_base(query: str):
         source = doc.metadata.get('source', 'unknown')
         score = doc.metadata.get('rerank_score', 0)
         formatted_res.append(f"[来源: {source} | 置信度: {score:.2f}]\n{doc.page_content}")
+    print('formatted_res:::',formatted_res)
 
     return "\n\n---\n\n".join(formatted_res)
 
 
 # [新增 4] 定义处理器节点 (核心拦截逻辑)
 async def processor_node(state: MessagesState):
-    """
-    拦截器：监听 MCP 抓取工具，自动存入 RAG 并缩减上下文
-    """
     messages = state["messages"]
     last_msg = messages[-1]
 
-    # 只处理 ToolMessage
-    if isinstance(last_msg, ToolMessage):
-        # 拦截目标：MCP 的抓取工具名 (需与 mcp_server_search.py 一致)
-        if last_msg.name in ["get_page_content", "batch_fetch"]:
+    # 1. 判断是否是我们要拦截的长文本工具
+    if isinstance(last_msg, ToolMessage) and last_msg.name in ["get_page_content", "batch_fetch"]:
+        target_id = last_msg.tool_call_id
 
-            content = last_msg.content
-            # 简单校验
-            if content and len(str(content)) > 50:
-                logger.info(f"🕵️ [Processor] 捕获到抓取数据 (长度: {len(str(content))})")
+        # 2. 往回找 AI 的原始指令 (寻找匹配该 ID 的 tool_calls)
+        source_url = "未知来源"
+        for msg in reversed(messages):
+            if hasattr(msg, "tool_calls") and msg.tool_calls:
+                for tc in msg.tool_calls:
+                    print('tc:::',tc)
+                    if tc["id"] == target_id:
+                        # 找到了！取出 AI 当初传给工具的 url 参数
+                        args = tc.get("args", {})
+                        print('args:::',args)
+                        # 如果是 batch_fetch 是 urls 列表，如果是 get_page_content 是 url 字符串
+                        source_url = str(args.get("urls") or args.get("url") or "tool_call_id")
+                        break
 
-                # A. 存入 RAG
-                rag.add_documents(str(content), source_url=f"tool_call_{last_msg.tool_call_id}")
+        # 3. 数据清洗
+        raw_content = str(last_msg.content)
 
-                # B. 替换记忆
-                new_content = (f"✅ [系统通知] ...")  # 内容不变
+        # A. 物理剔除所有图片标签 ![描述](url)
+        # 这些标签会导致 Agent 误以为图片链接是参考资料来源
+        cleaned = re.sub(r'!\[.*?\]\(.*?\)', '', raw_content)
 
-                return {
-                    "messages": [
-                        ToolMessage(
-                            content=new_content,
-                            tool_call_id=last_msg.tool_call_id,
-                            name=last_msg.name,
-                            # 🔥🔥🔥【新增这行】核心修复！！！🔥🔥🔥
-                            # 只有继承了上一条消息的 ID，LangGraph 才会执行“覆盖”操作，而不是“追加”
-                            id=last_msg.id
-                        )
-                    ]
-                }
+        # B. 剔除常见的网页“噪声”行 (页脚、备案、报警等)
+        # 解决第一个 formatted_res 里的“110报警/营业执照”污染问题
+        noise_keywords = ["版权所有", "©", "备案", "110报警", "营业执照", "免责声明", "出版物许可证"]
+        lines = cleaned.split('\n')
+        filtered_lines = [l for l in lines if not any(word in l for word in noise_keywords)]
+        final_text = '\n'.join(filtered_lines)
+
+        # 4. 物理入库 (离线模块)
+        rag.add_documents(str(last_msg.content), source_url=source_url)
+
+        # 5. 构造极其简单的通知
+        new_msg = ToolMessage(
+            content="✅ [系统] 内容已存入 RAG。由于原文过长，已在当前上下文中物理删除，请调用检索工具。",
+            tool_call_id=target_id,
+            name=last_msg.name,
+            id=last_msg.id  # 保持 ID 一致
+        )
+
+        # 6. 【断根操作】用“列表切片”直接剔除掉原本的那条长消息，替换为短消息
+        # 这样返回后，MessagesState 里的最后一条消息会被物理替换为我们的短消息
+        return {"messages":[new_msg]}
+
     return {}
 
 
@@ -106,7 +130,7 @@ def build_graph(available_tools):
     if not available_tools:
         print('⚠️ 未加载任何工具')
 
-    # [修改 A] 合并工具：MCP工具 + RAG查询工具
+    # [修改 A] 合并工具：MCP工具 + RAG查询工具(自创)
     all_tools = available_tools + [search_knowledge_base]
 
     llm = ChatOpenAI(
@@ -117,10 +141,33 @@ def build_graph(available_tools):
     )
 
     # [修改 B] 更新 Prompt，教会 Agent 工作流
-    sys_prompt = (
-        "你是一个智能研究助手。工作流程：\n"
-        "1. 搜索(web_search) -> 2. 抓取(batch_fetch) -> "
-        "3. [系统会自动存入RAG] -> 4. 你必须调用 'search_knowledge_base' 阅读内容 -> 5. 回答。"
+    sys_prompt = (f"""
+        你是一个专业、严谨的 AI 智能研究助手。
+        当前系统时间（时空锚点）是：{datetime.now().strftime("%Y年%m月%d日 %H:%M")}。所有检索到的信息都必须以此时间为基准进行审计。
+
+        ### 🛠️ 标准作业程序 (SOP):
+        1. ** 全网搜索 **: 调用 `web_search` 获取最新的信息摘要。
+        2. ** 深度抓取 **: 挑选最有价值的链接，调用 `batch_fetch` 获取正文。
+        3. ** 记忆切换 **: 注意！抓取后的正文已自动存入 RAG 知识库。你当前上下文中【没有】正文内容。
+        4. ** 精准检索 **: 你【必须】立即调用 `search_knowledge_base`。只有阅读了检索回来的片段，你才有权回答。
+        5. ** 整合输出 **: 根据检索到的事实，组织逻辑严密的回答。
+    
+        ### 📑 引用规范:
+        - ** 必须溯源 **: 你的每一个核心观点都必须对应参考资料。
+        - ** 格式要求 **: 在回复末尾列出【参考资料】，必须使用检索工具返回的真实 URL 链接。
+        - ** 严禁脑补 **: 如果 RAG 中没有相关信息，请诚实回答“知识库中未找到细节”，不要编造 URL。
+        
+        ### ⚠️ 检索与引用严律:
+        1. **真实溯源**: 你在检索结果中可能会看到大量 URL（如图片链接、页脚链接）。
+        2. **防伪校验**: 你【只能】将你通过 `batch_fetch` 真正抓取并阅读过的原文 URL 列为参考资料。
+        3. **剔除杂质**: 严禁将网页侧边栏、推荐阅读或版权声明中的无关链接列入参考资料。
+        4. **格式要求**:
+    
+        ### 📚 参考资料格式示例:
+        [1] https: // example.com / paper_details - xx年x应用行情主线深度分析报告
+        [2] https: // news.tech / report-2026
+        """
+
     )
 
     # 绑定合并后的工具列表
@@ -169,7 +216,7 @@ def build_graph(available_tools):
         }
     )
 
-    # [修改 C] 改变流向：Tools -> Processor -> Agent
+    # [修改 C] 改变流向：Tools -> Processor -> Agent (让工具返回内容先经过processor审查，rag内容存入，非rag内容才返还给agent)
     workflow.add_edge("tools", "processor")
     workflow.add_edge("processor", "agent")  # 以前是 tools -> agent
 
@@ -178,7 +225,10 @@ def build_graph(available_tools):
 
 async def chat_loop(app):
     thread_id = "user_123"
-    config = {"configurable": {"thread_id": thread_id}}
+    config = {
+        "configurable": {"thread_id": thread_id},
+        "recursion_limit":100 # 默认步数上限为25，但这对我们来说不够用
+    }
     while 1:
         user_input = input('\n\n👤 你:').strip()
         # 增加一个退出判断，方便调试
@@ -188,6 +238,11 @@ async def chat_loop(app):
 
 
 async def main():
+    # db_path = "./chroma_db"
+    # if os.path.exists(db_path):
+    #     shutil.rmtree(db_path)
+    #     print(f"🧹 已清空旧数据库目录: {db_path}")
+
     print("🔌 正在初始化MCP客户端...")
 
     client = MultiServerMCPClient(MCP_SERVERS)

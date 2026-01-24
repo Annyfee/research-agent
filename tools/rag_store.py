@@ -51,8 +51,8 @@ class RAGStore:
 
         # 切分器
         self.splitter = RecursiveCharacterTextSplitter(
-            chunk_size=800,
-            chunk_overlap=150,
+            chunk_size=1200,
+            chunk_overlap=250,
             # 明确指明切割方法，按这个顺序依次往后排（如果不指定会默认切）
             separators=["\n\n", "\n", "。", "！", "？", ".", "!", "?", " "]
         )
