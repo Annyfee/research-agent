@@ -9,6 +9,7 @@ from loguru import logger
 
 from config import OPENAI_API_KEY
 from state import ResearchAgent
+from tools.utils import clean_msg_for_deepseek
 
 llm = ChatOpenAI(
     model="deepseek-chat",
@@ -24,9 +25,7 @@ async def planner_node(state:ResearchAgent):
     职责: 将模糊的用户需求拆解为 2-4 个具体的、可执行的搜索指令。
     """
 
-    user_query = state["messages"][-1].content
-
-    logger.info(f"🎯 [Planner] 正在拆解课题: {user_query}")
+    logger.info(f"🎯 [Planner] 正在基于上下文拆解课题...")
 
 
     sys_prompt = f"""你是一名首席研究规划师。当前时间: {datetime.now().strftime("%Y-%m-%d %H:%M")}。
@@ -36,6 +35,11 @@ async def planner_node(state:ResearchAgent):
     1. **多维视角**: 不要只换一种说法搜。要从“定义/背景”、“技术原理”、“市场数据”、“竞品对比”、“最新评价”等不同维度拆解。
     2. **关键词化**: 输出必须是适合 Google/Bing 搜索的关键词组合，而不是长难句。
     3. **逻辑递进**: 子任务应当有先后逻辑，帮助后续的 Writer 建立完整的知识链条。
+    
+    ### 🚫 严禁事项:
+    1. **严禁输出任何 XML 标签**（如 <｜DSML｜> 等）。
+    2. **严禁尝试调用工具**，你只需要输出计划列表。
+    3. 不要输出任何解释性文字。
 
     【输出格式】
     {{
@@ -46,18 +50,17 @@ async def planner_node(state:ResearchAgent):
         ]
     }}
 
-    不要输出任何多余的解释或废话，只输出列表。
+    不要输出任何多余的解释或废话，只输出JSON。
     """
 
     # 只发System与User Query，保证上下文干净  这种写法用于单轮对话，x+x用于多轮对话
-    messages = [
-        SystemMessage(content=sys_prompt),
-        state["messages"][-1]
-    ] # 只将用户的单次提问加入消息列表
+    messages = [SystemMessage(content=sys_prompt)] + state["messages"][-20:]
+
+    safe_msg = clean_msg_for_deepseek(messages)
 
     # 保底确定返回数据格式正确
     try:
-        response = await llm.ainvoke(messages)
+        response = await llm.ainvoke(safe_msg)
         # 防止可能存在的markdown语法
         content = response.content.replace("```json","").replace("```","").strip()
         tasks = json.loads(content)["tasks"]
@@ -72,6 +75,6 @@ async def planner_node(state:ResearchAgent):
         logger.warning(f"⚠️ [Planner] 解析失败，回滚到单任务模式: {e}")
         # 保底:把用户原话当做任务
         return {
-            "tasks":[user_query],
+            "tasks":[state["messages"][-1].content]
             # "main_route":"surfer"
         }

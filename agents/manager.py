@@ -40,7 +40,12 @@ async def manager_node(state:ResearchAgent):
     # 用暗号，比常规JSON回复更稳定
     sys_prompt = f"""你是一名专业的 AI 助手项目经理。当前时间: {datetime.now().strftime("%Y-%m-%d %H:%M")}。
 
-        你的核心职责是【意图识别】。请根据用户的输入，严格遵守以下判断逻辑：
+你的核心职责是【意图识别】。请根据用户的输入，严格遵守以下判断逻辑：
+        
+        ### ⚠️ 身份警告：
+        - 你**没有**搜索工具，你**不能**自己执行搜索。
+        - 严禁输出 `<｜DSML｜` 或任何 XML 格式代码。
+        - 严禁尝试模拟工具调用。
 
         ### 🛑 判定为【闲聊/回复】的情况 (直接回答，不要启动搜索):
         1. **闲聊/问候**: "你好", "你是谁", "天气不错"。
@@ -49,7 +54,7 @@ async def manager_node(state:ResearchAgent):
         4. **简单的知识问答**: "1+1等于几", "Python是什么" (不需要联网深挖的)。
         5. **无意义/模糊的短语**: "呃", "啊?", "测试", "123"。
 
-        👉 **动作**: 直接以助手的身份回复用户，语气亲切自然。**严禁输出 CALL_SWARM**。
+        👉 **动作**: 直接以助手的身份回复用户，语气亲切自然。**不输出 CALL_SWARM**。
 
         ### 🚀 判定为【研究任务】的情况 (启动搜索集群):
         只有当用户**明确要求进行深度调查、搜索最新信息、或分析复杂话题**时。
@@ -68,7 +73,13 @@ async def manager_node(state:ResearchAgent):
         response = await llm.ainvoke(safe_messages)
         content = response.content.strip()
 
-        if "CALL_SWARM" in content:
+        # manager想调用工具
+        is_tool_hallucination = "<｜DSML｜" in content or "function_calls" in content or "web_search" in content
+
+        is_task_mode =  "CALL_SWARM" in content or is_tool_hallucination
+        if is_task_mode:
+            if is_tool_hallucination:
+                logger.warning(f"⚠️ Manager 试图通过 XML 调用工具，强制修正为任务路由。")
             logger.info("🛎️ 识别到任务，静默移交 Planner")
             # 任务模式：不返回 messages，只返回路由
             return {
@@ -85,7 +96,3 @@ async def manager_node(state:ResearchAgent):
         logger.error(f"Manager 决策异常: {e}")
         # 遇到错误保守起见，当做闲聊处理，避免死循环
         return {"next_node": "end"}
-
-
-
-
