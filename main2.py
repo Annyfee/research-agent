@@ -8,8 +8,6 @@ import shutil
 
 from datetime import datetime
 
-
-
 # --- 消音代码 --- 等级低于Warning的提示全部屏蔽
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
@@ -32,15 +30,12 @@ from langgraph.graph import StateGraph, MessagesState, START, END
 from langgraph.prebuilt import ToolNode
 from loguru import logger
 
-from config import OPENAI_API_KEY,LANGCHAIN_API_KEY
+from config import OPENAI_API_KEY, LANGCHAIN_API_KEY
 from tools.stream import run_agent_with_streaming
 
-os.environ["LANGCHAIN_TRACING_V2"] = "true" # 总开关，决定启用追踪功能
-os.environ["LANGCHAIN_PROJECT"] = "research-agent" # 自定义项目名
+os.environ["LANGCHAIN_TRACING_V2"] = "true"  # 总开关，决定启用追踪功能
+os.environ["LANGCHAIN_PROJECT"] = "research-agent"  # 自定义项目名
 os.environ["LANGCHAIN_API_KEY"] = LANGCHAIN_API_KEY
-
-
-
 
 # [新增 2] 初始化 RAG (单例模式)
 # 这一步会加载 rag_store.py 里的配置 (本地/云端)
@@ -48,9 +43,15 @@ rag = RAGStore()
 
 MCP_SERVERS = {
     "搜索服务": {
-        "transport": "streamable_http",
-        "url": "http://0.0.0.0:8002/mcp"
+        "transport": "http",
+        "url": "http://127.0.0.1:8003/mcp"
     }
+    # "搜索服务":{
+    #         "transport": "stdio",
+    #         "command": "python",
+    #         "args": ["-m", "tools.mcp_server_search"],
+    #         "env": None
+    # }
 }
 
 
@@ -73,7 +74,7 @@ def search_knowledge_base(query: str):
         source = doc.metadata.get('source', 'unknown')
         score = doc.metadata.get('rerank_score', 0)
         formatted_res.append(f"[来源: {source} | 置信度: {score:.2f}]\n{doc.page_content}")
-    print('formatted_res:::',formatted_res)
+    print('formatted_res:::', formatted_res)
 
     return "\n\n---\n\n".join(formatted_res)
 
@@ -83,6 +84,7 @@ async def processor_node(state: MessagesState):
     messages = state["messages"]
     last_msg = messages[-1]
 
+    print("messages:::",messages)
     # 1. 判断是否是我们要拦截的长文本工具
     if isinstance(last_msg, ToolMessage) and last_msg.name in ["get_page_content", "batch_fetch"]:
         target_id = last_msg.tool_call_id
@@ -92,11 +94,11 @@ async def processor_node(state: MessagesState):
         for msg in reversed(messages):
             if hasattr(msg, "tool_calls") and msg.tool_calls:
                 for tc in msg.tool_calls:
-                    print('tc:::',tc)
+                    print('tc:::', tc)
                     if tc["id"] == target_id:
                         # 找到了！取出 AI 当初传给工具的 url 参数
                         args = tc.get("args", {})
-                        print('args:::',args)
+                        print('args:::', args)
                         # 如果是 batch_fetch 是 urls 列表，如果是 get_page_content 是 url 字符串
                         source_url = str(args.get("urls") or args.get("url") or "tool_call_id")
                         break
@@ -111,8 +113,15 @@ async def processor_node(state: MessagesState):
         # B. 剔除常见的网页“噪声”行 (页脚、备案、报警等)
         # 解决第一个 formatted_res 里的“110报警/营业执照”污染问题
         noise_keywords = ["版权所有", "©", "备案", "110报警", "营业执照", "免责声明", "出版物许可证"]
-        lines = cleaned.split('\n')
-        filtered_lines = [l for l in lines if not any(word in l for word in noise_keywords)]
+        filtered_lines = []
+        for line in cleaned.split('\n'):
+            keep = True
+            for noise in noise_keywords:
+                if noise in line:
+                    keep = False
+                    break
+            if keep:
+                filtered_lines.append(line)
         final_text = '\n'.join(filtered_lines)
 
         # 4. 物理入库 (离线模块)
@@ -128,7 +137,7 @@ async def processor_node(state: MessagesState):
 
         # 6. 【断根操作】用“列表切片”直接剔除掉原本的那条长消息，替换为短消息
         # 这样返回后，MessagesState 里的最后一条消息会被物理替换为我们的短消息
-        return {"messages":[new_msg]}
+        return {"messages": [new_msg]}
 
     return {}
 
@@ -158,23 +167,29 @@ def build_graph(available_tools):
         3. ** 记忆切换 **: 注意！抓取后的正文已自动存入 RAG 知识库。你当前上下文中【没有】正文内容。
         4. ** 精准检索 **: 你【必须】立即调用 `search_knowledge_base`。只有阅读了检索回来的片段，你才有权回答。
         5. ** 整合输出 **: 根据检索到的事实，组织逻辑严密的回答。
-    
+        6. ** 多轮查询 **: 如果当前返回数据或质量不足，重新搜索或检索数据库。
+
         ### 📑 引用规范:
         - ** 必须溯源 **: 你的每一个核心观点都必须对应参考资料。
-        - ** 格式要求 **: 在回复末尾列出【参考资料】，必须使用检索工具返回的真实 URL 链接。
+        - ** 格式要求 **: 在回复末尾列出【参考资料】，必须使用检索工具返回的真实 URL 链接，返回URL链接不能重复。
         - ** 严禁脑补 **: 如果 RAG 中没有相关信息，请诚实回答“知识库中未找到细节”，不要编造 URL。
-        
+
         ### ⚠️ 检索与引用严律:
         1. **真实溯源**: 你在检索结果中可能会看到大量 URL（如图片链接、页脚链接）。
         2. **防伪校验**: 你【只能】将你通过 `batch_fetch` 真正抓取并阅读过的原文 URL 列为参考资料。
         3. **剔除杂质**: 严禁将网页侧边栏、推荐阅读或版权声明中的无关链接列入参考资料。
-        4. **格式要求**:
-    
+        4. ** 强文本分析输出 (Insight-Driven): **
+               - **拒绝罗列**: 严禁将检索到的片段进行简单的堆砌或无脑的列表罗列。
+               - **结论先行**: 每个章节必须以一个核心行业洞察或趋势判断作为开头，随后引用 RAG 事实进行严密论证。
+               - **跨源交叉对比**: 如果多个来源提到了同一事件（如美联储换届），你必须分析其共同点与分歧点，并指出当前时间点下最权威的消息。
+               - **时序审计逻辑**: 必须区分“历史背景”、“当前动态”与“前瞻预测”。严禁将 2025 年的预测性描述误写为 2026 年的既成事实。
+               - **文本张力**: 使用专业、干练的行业术语（如“存量博弈”、“边际效应”、“路径依赖”），使报告具备深度行业调研的质感，字里行间要体现出“分析”而非“复读”。
+
         ### 📚 参考资料格式示例:
         [1] https: // example.com / paper_details - xx年x应用行情主线深度分析报告
         [2] https: // news.tech / report-2026
         """
-    )
+                  )
 
     # 绑定合并后的工具列表
     llm_with_tools = llm.bind_tools(all_tools)
@@ -184,6 +199,7 @@ def build_graph(available_tools):
     async def agent_node(state: MessagesState):
         formatted_msg = []
         for msg in state["messages"]:
+            # 当发现ToolMessage非字符串返回时，将其修正为str形式
             if isinstance(msg, ToolMessage) and not isinstance(msg.content, str):
                 formatted_msg.append(
                     ToolMessage(
@@ -233,7 +249,7 @@ async def chat_loop(app):
     thread_id = "user_123"
     config = {
         "configurable": {"thread_id": thread_id},
-        "recursion_limit":100 # 默认步数上限为25，但这对我们来说不够用
+        "recursion_limit": 100  # 默认步数上限为25，但这对我们来说不够用
     }
     while 1:
         user_input = input('\n\n👤 你:').strip()

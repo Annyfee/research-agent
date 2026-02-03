@@ -98,7 +98,7 @@ class RAGStore:
         return True
 
     # RAG - 在线模块(粗排/精排/过滤)
-    def query(self, question: str, k_retrieve=50, k_final=6, score_threshold=0.6):
+    def query(self, question: str, k_retrieve=50, k_final=6, score_threshold=0.7):
         """
         检索流程: 向量粗排 -> Flashrank 精排
         粗排 - 计算数学距离（长得像就行）；
@@ -146,6 +146,27 @@ class RAGStore:
 
         logger.info(f"✅ [Result] 返回 {len(final_docs)} 个高分结果")
         return final_docs
+
+    # RAG检索返回逻辑
+    def query_formatted(self,query:str):
+        """
+        直接返回格式化好的字符串，给Tool和Writer用
+        """
+
+        results = self.query(query)
+
+        if not results:
+            return "知识库中未找到相关内容。"
+
+        # 格式化返回结果
+        formatted_res = []
+        for doc in results:
+            source = doc.metadata.get('source', 'unknown')
+            score = doc.metadata.get('rerank_score', 0)
+            formatted_res.append(f"[来源: {source} | 置信度: {score:.2f}]\n{doc.page_content}")
+        print('formatted_res:::', formatted_res)
+
+        return "\n\n---\n\n".join(formatted_res)
 
 # --- 测试代码 ---
 if __name__ == "__main__":

@@ -1,46 +1,87 @@
+from functools import partial
+
+from langgraph.checkpoint.memory import MemorySaver
 from langgraph.constants import START, END
 from langgraph.graph import StateGraph
+from langgraph.prebuilt import ToolNode
+from langgraph.types import Send
+from loguru import logger
 
+from agents.researcher.core import core_node
+from agents.researcher.graph import build_researcher_graph
+from agents.researcher.leader import leader_node
+from agents.manager import manager_node
+from agents.planner import planner_node
+from agents.researcher.surfer import surfer_node
+from agents.writer import writer_node
 from state import ResearchAgent
 
+from tools.registry import load_all_tools
 
 
-def plan_node(state:ResearchAgent):
-    print('Planner is working')
-    return {"plan":["关键词1","关键词2"],"logs":[f'Planner 已根据主题{state.get("topic")}生成计划']}
-
-def research_node(state:ResearchAgent):
-    print("Researcher is working")
-    return {"document":[{"url":"mock_url"}],"logs":["Researcher 已完成信息搜集，获取1条数据"]}
-
-def write_node(state:ResearchAgent):
-    print("Writer is working")
-    return {"report":"# Mock Report","logs":["Writer已生成报告"]}
-
-def publish_node(state:ResearchAgent):
-    print("Publisher is working")
-    return {"logs":["已归档"]}
 
 
-workflow = StateGraph(ResearchAgent)
-
-workflow.add_node("plan",plan_node)
-workflow.add_node("research",research_node)
-workflow.add_node("write",write_node)
-workflow.add_node("publish",publish_node)
+def route(state:ResearchAgent):
+    return state.get("main_route","end_chat")
 
 
-workflow.add_edge(START,"plan")
-workflow.add_edge("plan","research")
-workflow.add_edge("research","write")
-workflow.add_edge("write","publish")
-workflow.add_edge("publish",END)
+# 并发分发逻辑
+def distribute_tasks(state:ResearchAgent):
+    """
+    Map 过程：
+    将 Planner 生成的 tasks 列表，拆分成一个个独立的 Send 指令。
+    每个 Send 会启动一个 Researcher 子图实例。
+    """
+    tasks = state.get("tasks",[])
+    logger.info(f"\n🚀 [Main] 正在并发分发 {len(tasks)} 个任务给 Researcher 子图...")
 
-
-app = workflow.compile()
+    return [
+        Send(
+            "researcher",
+            {
+                "task":task,
+                "task_idx":i+1,
+                "retry_count":0,
+                "messages":[] # 防止上下文污染
+            }
+        )
+        for i,task in enumerate(tasks)
+    ]
 
 
 
 
 
+async def build_graph():
+    """
+    组装Swarm智能体网络
+    """
+    # tools = await load_all_tools()
 
+    researcher_app = await build_researcher_graph()
+
+    workflow = StateGraph(ResearchAgent)
+
+    workflow.add_node("manager",manager_node)
+    workflow.add_node("planner",planner_node)
+    workflow.add_node("researcher",researcher_app)
+    workflow.add_node("writer",writer_node)
+
+
+    workflow.add_edge(START,"manager")
+    workflow.add_conditional_edges(
+        "manager",
+        route,
+        {
+            "planner":"planner",
+            "end_chat":END
+        }
+    )
+    workflow.add_conditional_edges(
+        "planner",
+        distribute_tasks,
+        ["researcher"] # 明确指明它可能去的节点
+    )
+    workflow.add_edge("researcher","writer")
+    workflow.add_edge("writer",END)
+    return workflow.compile(checkpointer=MemorySaver())
