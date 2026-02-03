@@ -1,0 +1,91 @@
+# 现在问题:
+# 其一:第二次运行立刻报错
+# 其二:内容判定过短而没有入库，agent也不知道 (这里我觉得要修改逻辑，如果不满足入库条件应该立刻结束，而不是尝试入库而花时间)
+# 其三:ai跟我说是历史包袱啥的，这里我不太理解，还需要再看看
+# 其四:看ai的话来理解。
+
+
+
+
+
+
+# 【前台】 分析话术，选择是否传递当前任务，还是判定用户在闲聊，不往后启动。
+from datetime import datetime
+
+from langchain_core.messages import SystemMessage
+from langchain_openai import ChatOpenAI
+from loguru import logger
+
+from config import OPENAI_API_KEY
+from state import ResearchAgent
+from tools.utils import clean_msg_for_deepseek
+
+# llm每次初始化放在外面，避免每次连接都重新调用
+llm = ChatOpenAI(
+    model="deepseek-chat",
+    api_key=OPENAI_API_KEY,
+    base_url="https://api.deepseek.com",
+    temperature=0
+)
+
+
+async def manager_node(state:ResearchAgent):
+    """
+    【前台经理】
+    职责：分诊。
+    - 闲聊 -> 回复用户 -> 结束
+    - 任务 -> 不回复(静默) -> 移交 Planner
+    """
+
+    # 用暗号，比常规JSON回复更稳定
+    sys_prompt = f"""你是一名专业的 AI 助手项目经理。当前时间: {datetime.now().strftime("%Y-%m-%d %H:%M")}。
+
+        你的核心职责是【意图识别】。请根据用户的输入，严格遵守以下判断逻辑：
+
+        ### 🛑 判定为【闲聊/回复】的情况 (直接回答，不要启动搜索):
+        1. **闲聊/问候**: "你好", "你是谁", "天气不错"。
+        2. **追问/纠正**: "不对", "我问的是这个", "停下", "在这个基础上再详细点"。
+        3. **针对上一轮报告的提问**: "你觉得刚才的报告质量好吗", "为什么结果这么短"。
+        4. **简单的知识问答**: "1+1等于几", "Python是什么" (不需要联网深挖的)。
+        5. **无意义/模糊的短语**: "呃", "啊?", "测试", "123"。
+
+        👉 **动作**: 直接以助手的身份回复用户，语气亲切自然。**严禁输出 CALL_SWARM**。
+
+        ### 🚀 判定为【研究任务】的情况 (启动搜索集群):
+        只有当用户**明确要求进行深度调查、搜索最新信息、或分析复杂话题**时。
+        例如: "帮我查一下DeepSeek的最新融资", "分析2026年美国对委内瑞拉政策", "调研AI Agent的技术栈"。
+
+        👉 **动作**: **严禁**回答问题。**必须严格且仅输出暗号字符串**: "CALL_SWARM"
+        """
+
+
+    messages = [SystemMessage(content=sys_prompt)] + state['messages']
+
+    # 中间件清洗
+    safe_messages = clean_msg_for_deepseek(messages)
+
+    try:
+        response = await llm.ainvoke(safe_messages)
+        content = response.content.strip()
+
+        if "CALL_SWARM" in content:
+            logger.info("🛎️ 识别到任务，静默移交 Planner")
+            # 任务模式：不返回 messages，只返回路由
+            return {
+                "main_route":"planner"
+            }
+        else:
+            logger.info("☕ 识别为闲聊，直接回复")
+            # 闲聊模式：必须返回 messages (让用户看到回复)，并指向结束
+            return {
+                "main_route":"end_chat",
+                "messages":[response]
+            }
+    except Exception as e:
+        logger.error(f"Manager 决策异常: {e}")
+        # 遇到错误保守起见，当做闲聊处理，避免死循环
+        return {"next_node": "end"}
+
+
+
+
