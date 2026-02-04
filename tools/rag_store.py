@@ -41,14 +41,6 @@ class RAGStore:
                 openai_api_base=EMBEDDING_BASE_URL,
                 check_embedding_ctx_length=False # 跳过长度检查，避免报错
             )
-
-        # Reranker:精排序 (Flashrank:为了适应格式，在精排序前后要转换协议)
-        # Flashrank 只有 100MB，4G 服务器完全跑得动，为了逻辑简单，保持本地运行
-        self.reranker = Ranker(
-            model_name="ms-marco-MiniLM-L-12-v2",
-            cache_dir="./models"
-        )
-
         # 切分器
         self.splitter = RecursiveCharacterTextSplitter(
             chunk_size=1200,
@@ -63,6 +55,13 @@ class RAGStore:
             # 选择用该模型来做embedding的工作
             embedding_function=self.embedding
         )
+        # Reranker:精排序 (Flashrank:为了适应格式，在精排序前后要转换协议)
+        # Flashrank 只有 100MB，4G 服务器完全跑得动，为了逻辑简单，保持本地运行
+        self.reranker = Ranker(
+            model_name="ms-marco-MiniLM-L-12-v2",
+            cache_dir="./models"
+        )
+
         logger.info("✅ [Init] RAG 系统就绪")
 
     # RAG - 离线模块(加载与切块/向量化/存入向量数据库)
@@ -77,6 +76,7 @@ class RAGStore:
             return False
 
         # 封装 Document(Document是langchain固定接收的对象格式) metadata则指明具体身份
+        # 注:后续我们会不断沿用这个数据结构，可以理解为数据库反复读写查询，但其参数没变
         raw_doc = Document(page_content=text_content, metadata={"source": source_url})
         # 切片
         chunks = self.splitter.split_documents([raw_doc])
@@ -103,10 +103,15 @@ class RAGStore:
         检索流程: 向量粗排 -> Flashrank 精排
         粗排 - 计算数学距离（长得像就行）；
         精排 - 进行语义对齐（仔细理解出核心逻辑）
+
+        question:问题；
+        k_retrieve:粗排个数;
+        k_final:精排个数;
+        score_threshold:得分阈值/低于此抛弃
         """
         # Phase 1: 粗排
         logger.info(f"🔍 [Search] 向量检索 Top-{k_retrieve}...")
-        # 这个doc与后面的Document(xx)指向同一个参数封装，是因为二者(Chroma/langchain-langchain_chroma)已经互相集成好
+        # 这个doc与前面的Document(xx)指向同一个参数(page_content,metadata)封装，是因为二者(Chroma/langchain-langchain_chroma)已经互相集成好,所以可以直接调用
         docs = self.vector_store.similarity_search(question, k=k_retrieve)
 
         if not docs:
@@ -119,20 +124,22 @@ class RAGStore:
         # FlashRank是针对精排序的。所以这里在数据传过去与传回来都需要调整格式。
         passages = []
         for i,doc in enumerate(docs):
-            passages.append({"id": str(i), "text": doc.page_content, "meta": doc.metadata})
+            passages.append({"id": str(i), "text": doc.page_content, "meta": doc.metadata}) # 调用add_documents里的参数
 
         # for i, doc in enumerate(docs):
         #     print(doc,'\n')
         #     print(doc.page_content,'\n')
         #     print(doc.metadata,'\n')
 
+        # 把LangChain的Document列表转换为FlashRank理解的passages列表
         rerank_request = RerankRequest(query=question, passages=passages)
+        # 将数据喂给精排模型，并返回一个打分列表
         results = self.reranker.rerank(rerank_request)
         # print(results)
 
         # Phase 3: 过滤
         final_docs = []
-        # 必须得分超过0.6才能返回
+        # 必须得分超过0.7才能返回
         for res in results:
             if res['score'] >= score_threshold:
                 # 将FlashRank返回的py字典转化为LangChain接受的Document对象
@@ -164,7 +171,7 @@ class RAGStore:
             source = doc.metadata.get('source', 'unknown')
             score = doc.metadata.get('rerank_score', 0)
             formatted_res.append(f"[来源: {source} | 置信度: {score:.2f}]\n{doc.page_content}")
-        print('formatted_res:::', formatted_res)
+        # print('formatted_res:::', formatted_res)
 
         return "\n\n---\n\n".join(formatted_res)
 
