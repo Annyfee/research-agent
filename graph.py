@@ -1,3 +1,4 @@
+import uuid
 from functools import partial
 
 from langgraph.checkpoint.memory import MemorySaver
@@ -20,10 +21,8 @@ from tools.registry import load_all_tools
 
 
 
-
 def route(state:ResearchAgent):
     return state.get("main_route","end_chat")
-
 
 # 并发分发逻辑
 def distribute_tasks(state:ResearchAgent):
@@ -33,12 +32,16 @@ def distribute_tasks(state:ResearchAgent):
     每个 Send 会启动一个 Researcher 子图实例。
     """
     tasks = state.get("tasks",[])
+
+    session_id =state.get("session_id","default_session")
+
     logger.info(f"\n🚀 [Main] 正在并发分发 {len(tasks)} 个任务给 Researcher 子图...")
 
     return [
         Send(
             "researcher",
             {
+                "session_id":session_id,
                 "task":task,
                 "task_idx":i+1,
                 "retry_count":0,

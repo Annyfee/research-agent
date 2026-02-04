@@ -65,7 +65,7 @@ class RAGStore:
         logger.info("✅ [Init] RAG 系统就绪")
 
     # RAG - 离线模块(加载与切块/向量化/存入向量数据库)
-    def add_documents(self, text_content: str, source_url: str = ""):
+    def add_documents(self, text_content: str, source_url: str = "",session_id : str = None):
         """
         存入向量数据库 (自动分批处理)
         text_content:需要存储的原始文本内容
@@ -77,7 +77,7 @@ class RAGStore:
 
         # 封装 Document(Document是langchain固定接收的对象格式) metadata则指明具体身份
         # 注:后续我们会不断沿用这个数据结构，可以理解为数据库反复读写查询，但其参数没变
-        raw_doc = Document(page_content=text_content, metadata={"source": source_url})
+        raw_doc = Document(page_content=text_content, metadata={"source": source_url,"session_id":session_id})
         # 切片
         chunks = self.splitter.split_documents([raw_doc])
 
@@ -98,7 +98,7 @@ class RAGStore:
         return True
 
     # RAG - 在线模块(粗排/精排/过滤)
-    def query(self, question: str, k_retrieve=50, k_final=6, score_threshold=0.7):
+    def query(self, question: str,session_id:str, k_retrieve=50, k_final=6, score_threshold=0.7):
         """
         检索流程: 向量粗排 -> Flashrank 精排
         粗排 - 计算数学距离（长得像就行）；
@@ -112,7 +112,7 @@ class RAGStore:
         # Phase 1: 粗排
         logger.info(f"🔍 [Search] 向量检索 Top-{k_retrieve}...")
         # 这个doc与前面的Document(xx)指向同一个参数(page_content,metadata)封装，是因为二者(Chroma/langchain-langchain_chroma)已经互相集成好,所以可以直接调用
-        docs = self.vector_store.similarity_search(question, k=k_retrieve)
+        docs = self.vector_store.similarity_search(question, k=k_retrieve,filter={"session_id":session_id}) # filter作为检索条件
 
         if not docs:
             logger.warning("⚠️ 未找到相关文档")
@@ -154,13 +154,24 @@ class RAGStore:
         logger.info(f"✅ [Result] 返回 {len(final_docs)} 个高分结果")
         return final_docs
 
+    def clear_session(self,session_id):
+        """
+        任务完成时，清空该用户的RAG数据（临时RAG）
+        """
+        try:
+            self.vector_store.delete(where={"session_id":session_id}) # 选中该session_id对应的数据并删除
+            logger.success(f"🧹 [Clear] 已清空用户({session_id}) 的临时 RAG 数据")
+        except Exception as e:
+            logger.error(f"❌ 清库失败: {e}")
+
+
     # RAG检索返回逻辑
-    def query_formatted(self,query:str):
+    def query_formatted(self,query:str,session_id:str):
         """
         直接返回格式化好的字符串，给Tool和Writer用
         """
 
-        results = self.query(query)
+        results = self.query(query,session_id)
 
         if not results:
             return "知识库中未找到相关内容。"

@@ -29,12 +29,10 @@ async def writer_node(state:ResearchAgent):
     content_blocks = []
     tasks = state.get("tasks",[])
 
-
-
-
+    session_id = state.get("session_id","default_session")
 
     for i,task in enumerate(tasks):
-        retrieved_text = global_rag_store.query_formatted(task)
+        retrieved_text = global_rag_store.query_formatted(task,session_id=session_id)
         block = f"""
         ### 课题:{i+1}:{task}
         【检索到的事实与数据】:
@@ -94,6 +92,10 @@ async def writer_node(state:ResearchAgent):
     try:
         response = await llm.ainvoke(message)
         logger.success("✅ [Writer] 报告撰写完成")
+
+        global_rag_store.clear_session(session_id)
+        logger.info(f"🧹 [Writer] 任务完成，清理 Session: {session_id}")
+
         return {
             # "research_notes": response.content,
             "messages":[response]

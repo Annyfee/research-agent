@@ -69,7 +69,7 @@ async def core_node(state:Researcher):
 
         if len(final_text) > 200: # 字数必须200+才记录
             # 物理入库
-            global_rag_store.add_documents(final_text, source_url)
+            global_rag_store.add_documents(final_text, source_url,session_id=state.get("session_id","default_session"))
             # 构造简单通知以返回
             new_msg = ToolMessage(
                 content="✅ [系统] 内容已存入 RAG。由于原文过长，已在当前上下文中物理删除，请调用检索工具。",

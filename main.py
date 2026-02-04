@@ -1,5 +1,7 @@
 import logging
 
+import state
+
 # --- 消音代码 --- 等级低于Warning的提示全部屏蔽
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
@@ -22,11 +24,13 @@ from tools.stream import run_agent_with_streaming
 async def main():
     logger.info("🚀 正在启动 Research Swarm 系统...")
 
+    session_id = str(uuid.uuid4())
+    state.session_id = session_id
+
     app = await build_graph()
 
-    thread_id = str(uuid.uuid4())
     config = {
-        "configurable":{"thread_id":thread_id,},
+        "configurable":{"thread_id":session_id,},
         "recursion_limit": 100
     }
 
