@@ -1,13 +1,11 @@
 from langchain_core.messages import HumanMessage
 import json
 
-async def run_agent_with_streaming(app,query:str,config:dict = None):
+async def run_agent_with_streaming(app,inputs:dict,config:dict = None):
     """
     通用流式运行器，负责将LangGraph的运行过程可视化输出
     """
     print('🤖 AI:',end='',flush=True)
-
-    inputs = {"messages":[HumanMessage(content=query)]}
 
     async for event in app.astream_events(inputs,config,version="v2"):
         kind = event["event"]

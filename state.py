@@ -1,4 +1,13 @@
+from typing import Annotated
+
 from langgraph.graph import MessagesState
+
+
+# 返回首个状态(后续返回状态不做处理)
+def reduce_share_id(left,right):
+    if left:
+        return left
+    return right
 
 
 # 定义类属性是 class xx(yy) 定义def才是 def xx(state:yy)
@@ -7,7 +16,7 @@ from langgraph.graph import MessagesState
 
 class ResearchAgent(MessagesState):
     # 全局上下文
-    session_id:str
+    session_id:Annotated[str,reduce_share_id]
 
     # --- 主图业务状态 ---
     # planner 拆解出来的任务清单:

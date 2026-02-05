@@ -98,7 +98,7 @@ class RAGStore:
         return True
 
     # RAG - 在线模块(粗排/精排/过滤)
-    def query(self, question: str,session_id:str, k_retrieve=50, k_final=6, score_threshold=0.7):
+    def query(self, question: str,session_id:str, k_retrieve=50, k_final=6, score_threshold=0.3):
         """
         检索流程: 向量粗排 -> Flashrank 精排
         粗排 - 计算数学距离（长得像就行）；
@@ -139,7 +139,7 @@ class RAGStore:
 
         # Phase 3: 过滤
         final_docs = []
-        # 必须得分超过0.7才能返回
+        # 必须得分超过0.3才能返回
         for res in results:
             if res['score'] >= score_threshold:
                 # 将FlashRank返回的py字典转化为LangChain接受的Document对象
