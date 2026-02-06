@@ -55,7 +55,7 @@ def distribute_tasks(state:ResearchAgent):
 
 
 
-async def build_graph():
+async def build_graph(checkpointer=None):
     """
     组装Swarm智能体网络
     """
@@ -87,4 +87,8 @@ async def build_graph():
     )
     workflow.add_edge("researcher","writer")
     workflow.add_edge("writer",END)
-    return workflow.compile(checkpointer=MemorySaver())
+
+    if checkpointer is None:
+        return workflow.compile(checkpointer=MemorySaver())
+
+    return workflow.compile(checkpointer=checkpointer)

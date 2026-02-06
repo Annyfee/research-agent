@@ -110,8 +110,8 @@ deep-research-agent/
 - [x] v0.1 Core: 完成 LangGraph 闭环，跑通 Map-Reduce 流程
 - [x] v0.2 Performance: 实现 mcp_server 的全异步改造，解决并发阻塞
 - [x] v0.3 Intelligence: 优化 Manager 意图识别，防止非任务指令误触
-- [ ] v0.4 Isolation (In Progress): 实现基于 session_id 的多用户 RAG 隔离
-- [ ] v0.5 Backend: 封装 FastAPI 接口，支持 SSE 流式输出
+- [x] v0.4 Isolation (In Progress): 实现基于 session_id 的多用户 RAG 隔离
+- [x] v0.5 Backend: 封装 FastAPI 接口，支持 SSE 流式输出
 - [ ] v0.6 Frontend: 集成 Streamlit 可视化驾驶舱
 - [ ] v1.0 DevOps: Docker 容器化封装，实现一键部署
 
