@@ -1,4 +1,5 @@
 import json
+import os
 import uuid
 from contextlib import asynccontextmanager
 
@@ -13,6 +14,12 @@ from sympy.codegen.fnodes import allocatable
 
 from graph import build_graph
 from tools.utils import parse_langgraph_event
+
+
+
+# 文件夹不存在，则创建
+for path in ["logs","db"]:
+    os.makedirs(path,exist_ok=True)
 
 
 logger.add("logs/server.log",rotation="10 MB")
