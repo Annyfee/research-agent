@@ -12,7 +12,6 @@ from loguru import logger
 from pydantic import BaseModel
 from starlette.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from sympy.codegen.fnodes import allocatable
 
 from graph import build_graph
 from tools.utils import parse_langgraph_event
