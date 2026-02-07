@@ -1,0 +1,21 @@
+# 编排服务:对于docker compose up --build而言，俩文件(Dockerfile/docker-compose.yml)都需要 & build是打包镜像(代码/环境一更新就需要重新打包)，up是运行该镜像
+
+# 定义要跑什么服务
+version: '3.8'
+
+services:
+  research-backend:
+    # 构建位置(当前目录的Dockerfile处构建) 与 是否自动重启
+    build: .
+    restart: always
+
+    # 左边(服务器端口)对外开放，右边(容器端口)内部监听，冒号实现流量转发
+    ports:
+      - "8011:8011"
+
+    # 数据挂载 - 数据持久化:左边是宿主机，右边是容器内部 二者数据永远会实时同步，以防出现容器内部文件丢失造成文件丢失的情况
+    volumes:
+      - ./db:/app/db
+      - ./logs:/app/logs
+    env_file:
+      - .env
