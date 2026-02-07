@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import os
@@ -30,7 +31,12 @@ for path in ["logs","db"]:
     os.makedirs(path,exist_ok=True)
 
 
+# 创建日志
 logger.add("logs/server.log",rotation="10 MB")
+
+# 全局限流器 - 只有5个会话会运行
+MAX_CONCURRENT_USERS = asyncio.Semaphore(5)
+
 
 
 class ChatRequest(BaseModel):
@@ -86,19 +92,21 @@ async def event_generator(inputs:dict,config:dict):
     """
     负责将LangGraph事件转换为SSE数据流
     """
-    graph = app.state.graph
-    try:
-        # 启动Graph流式执行 - 这里只负责丢数据，展示什么数据(如on_tool_start)由前端来管
-        async for event in graph.astream_events(inputs,config,version="v2"):
-            data = parse_langgraph_event(event)
-            if data:
-                # 返回SSE协议格式数据
-                yield f"data:{json.dumps(data,ensure_ascii=False)}\n\n" # 这里直接扔代码
+    # 限制最大并发数
+    async with MAX_CONCURRENT_USERS:
+        graph = app.state.graph
+        try:
+            # 启动Graph流式执行 - 这里只负责丢数据，展示什么数据(如on_tool_start)由前端来管
+            async for event in graph.astream_events(inputs,config,version="v2"):
+                data = parse_langgraph_event(event)
+                if data:
+                    # 返回SSE协议格式数据
+                    yield f"data:{json.dumps(data,ensure_ascii=False)}\n\n" # 这里直接扔代码
 
-    except Exception as e:
-        logger.error(f"❌ 运行出错: {e}")
-        error_data = {"type":"error","content":str(e)}
-        yield f"data:{json.dumps(error_data,ensure_ascii=False)}\n\n"
+        except Exception as e:
+            logger.error(f"❌ 运行出错: {e}")
+            error_data = {"type":"error","content":str(e)}
+            yield f"data:{json.dumps(error_data,ensure_ascii=False)}\n\n"
 
 
 
