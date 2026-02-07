@@ -8,7 +8,6 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain_openai import ChatOpenAI
 from langgraph.graph import MessagesState
 from loguru import logger
-from torch.serialization import clear_safe_globals
 
 from agents.researcher.state import Researcher
 from config import OPENAI_API_KEY
