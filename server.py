@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import uuid
 from contextlib import asynccontextmanager
@@ -15,7 +16,14 @@ from sympy.codegen.fnodes import allocatable
 from graph import build_graph
 from tools.utils import parse_langgraph_event
 
-
+# --- 消音代码 --- 等级低于Warning的提示全部屏蔽
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("openai").setLevel(logging.WARNING)
+logging.getLogger("chromadb").setLevel(logging.WARNING)
+logging.getLogger("mcp").setLevel(logging.WARNING)
+logging.getLogger("chromadb").setLevel(logging.WARNING)
+# -----------------------
 
 # 文件夹不存在，则创建
 for path in ["logs","db"]:
