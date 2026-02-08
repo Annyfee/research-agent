@@ -1,7 +1,7 @@
 # 编排服务:对于docker compose up --build而言，俩文件(Dockerfile/docker-compose.yml)都需要 & build是打包镜像(代码/环境一更新就需要重新打包)，up是运行该镜像
 
-# 定义要跑什么服务
-version: '3.8'
+# 定义要跑什么服务 - 属性已过时
+# version: '3.8'
 
 services:
   research-backend:
