@@ -196,10 +196,15 @@ if __name__ == "__main__":
 
     # 模拟入库
     text = "DeepSeek-V3 是一款强大的模型，API 价格非常便宜。SiliconFlow 提供了极速的推理服务。"
-    rag.add_documents(text, "test_source")
+    import uuid
+    sid = str(uuid.uuid4())
+    rag.add_documents(text, "test_source",session_id=sid)
 
     # 模拟检索
-    res = rag.query("DeepSeek 怎么样？")
+
+    res = rag.query("DeepSeek 怎么样？",session_id=sid)
+    print(res)
+    rag.clear_session(session_id=sid)
     for r in res:
         print('r:::',r)
         print('r.metadata:::',r.metadata)
