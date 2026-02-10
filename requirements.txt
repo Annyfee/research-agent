@@ -19,4 +19,5 @@ Requests==2.32.5
 starlette==0.52.1
 sympy==1.14.0
 uvicorn==0.40.0
+streamlit==1.54.0
 langgraph.checkpoint.sqlite
