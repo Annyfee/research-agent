@@ -63,7 +63,7 @@ async def lifespan(app:FastAPI):
         # 编译Graph:连接数据库，让数据库在运行时自动把状态保存到sqlite文件中
         compiled_graph = await build_graph(checkpointer=checkpointer)
 
-        # 存入app的state变量内
+        # 存入app的state变量内，之后再用
         app.state.graph = compiled_graph
         logger.info("✅ Graph 已编译 (带持久化记忆)")
 
@@ -100,7 +100,7 @@ async def event_generator(inputs:dict,config:dict):
                 data = parse_langgraph_event(event)
                 if data:
                     # 返回SSE协议格式数据
-                    yield f"data:{json.dumps(data,ensure_ascii=False)}\n\n" # 这里直接扔代码
+                    yield f"data:{json.dumps(data,ensure_ascii=False)}\n\n"
 
         except Exception as e:
             logger.error(f"❌ 运行出错: {e}")
