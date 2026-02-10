@@ -1,14 +1,15 @@
 # 编排服务:对于docker compose up --build而言，俩文件(Dockerfile/docker-compose.yml)都需要 & build是打包镜像(代码/环境一更新就需要重新打包)，up是运行该镜像
+#
 
 # 定义要跑什么服务 - 属性已过时
 # version: '3.8'
 
 services:
   research-backend:
-    # 构建位置(当前目录的Dockerfile处构建) 与 是否自动重启
+    # 构建位置(依靠当前目录的Dockerfile来构建) 与 是否自动重启
     build: .
     restart: always
-
+    container_name: research_backend
     # 左边(服务器端口)对外开放，右边(容器端口)内部监听，冒号实现流量转发
     ports:
       - "8011:8011"
@@ -19,3 +20,9 @@ services:
       - ./logs:/app/logs
     env_file:
       - .env
+
+    environment: # 端口号
+      - MCP_HOST=mcp_host # 环境变量注入，让后端获取
+
+    extra_hosts: # IP地址
+      - mcp_host:host-gateway # 让mcp_host指向宿主机的ip地址
