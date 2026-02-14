@@ -33,10 +33,6 @@ async def surfer_node(state:Researcher,tools=None):
 
     prefix = f"🏄 [Surfer #{task_idx}]"
 
-    advice = ""
-    if retry_count > 0:
-        advice = f"⚠️ 警告: 上一次搜索未获得有效信息。这是第 {retry_count} 次重试。请务必更换更精准的关键词，或者尝试不同的搜索方向。"
-
     # 快速判断是否有工具返回
     has_search_result = any(isinstance(msg,ToolMessage) for msg in state["messages"])
 
@@ -50,8 +46,6 @@ async def surfer_node(state:Researcher,tools=None):
     sys_prompt = f"""你是一名专业的全网信息采集专家。
         当前任务: "{task}"
         当前时间: {datetime.now().strftime("%Y-%m-%d")}
-
-        {advice}
 
         ### 🛠️ 你的标准作业程序 (SOP):
         你处于“Map-Reduce”架构的【采集端】。你的唯一目标是**获取高质量的全文数据**。
@@ -74,37 +68,51 @@ async def surfer_node(state:Researcher,tools=None):
         3. **目标导向**: 优先获取长文、研报、深度解析。
         """
 
-    # # 格式化消息：确保所有 ToolMessage.content 都是字符串
-    # formatted_msg = []
-    # # 是否有工具返回
-    # has_search_result = False
-    # for msg in state["messages"]:
-    #     if isinstance(msg, ToolMessage) and not isinstance(msg.content, str):
-    #         has_search_result = True
-    #         # 如果 content 是列表，转换为 JSON 字符串 --》 这个问题非常深:ToolMessage的所有内容一定要做一次修复:你无法确保MCP返回的信息百分百是str而非list
-    #         formatted_msg.append(
-    #             ToolMessage(
-    #                 content=json.dumps(msg.content, ensure_ascii=False),
-    #                 tool_call_id=msg.tool_call_id,
-    #                 name=msg.name,
-    #                 id=msg.id
-    #             )
-    #         )
-    #     else:
-    #         formatted_msg.append(msg)
 
-    messages = [SystemMessage(content=sys_prompt)] + state["messages"]
+
+    last_tool_msg = None
+    for msg in reversed(state["messages"]):
+        if isinstance(msg,ToolMessage):
+            last_tool_msg = msg
+            break
+
+    if retry_count > 0:
+        has_search_result = any(
+            isinstance(msg,ToolMessage) and msg.name == "web_search"
+            for msg in state["messages"]
+        )
+        if has_search_result:
+            advice = f"⚠️ 第 {retry_count} 次重试。上方已有搜索结果，禁止再次调用 web_search，直接从列表中挑选URL调用 batch_fetch。"
+        else:
+            advice = f"⚠️ 第 {retry_count} 次重试。请更换关键词重新搜索。"
+
+        messages = [SystemMessage(content=sys_prompt)]
+
+        # 找最后一对 AI+Tool 消息，成对携带
+        last_pair_start = -1
+        for i, msg in enumerate(reversed(state["messages"])):
+            if hasattr(msg, "tool_calls") and msg.tool_calls:
+                last_pair_start = len(state["messages"]) - 1 - i
+                break
+
+        if last_pair_start >= 0:
+            messages.extend(state["messages"][last_pair_start:])
+
+        messages.append(HumanMessage(content=f"当前具体任务: {task}\n{advice}"))
+    # 首轮搜索时，取六条来判断上下文
+    else:
+        messages = [
+            SystemMessage(content=sys_prompt),
+            *state["messages"][-6:],  # 只取最近 4 条，足够判断上下文
+            HumanMessage(content=f"当前具体任务: {task}")
+        ]
 
     safe_messages = clean_msg_for_deepseek(messages)
 
-    # if not formatted_msg:
-    #     messages.append(HumanMessage(content=f"请开始执行采集任务: {task}")) # 只在冷启动，无历史时让它开始
 
     if not tools:
         logger.error("❌ Surfer 没拿到工具列表")
         return {"messages": [HumanMessage(content="系统错误：工具未加载")]}
-
-
 
     try:
         response = await llm.bind_tools(tools).ainvoke(safe_messages)
@@ -123,101 +131,13 @@ async def surfer_node(state:Researcher,tools=None):
         # 捕获 llm 的内容风控错误
         err_dict = e.body or {}
         if "Content Exists Risk" in str(err_dict):
-            logger.error(f"🚫 {prefix} 触发 DeepSeek 内容风控，强制跳过当前轮次。")
+            logger.error(f"🚫 {prefix} 触发内容风控，强制跳过当前轮次。")
             # 返回一个由 Human 构造的 System 提示，假装这一步失败了，让 Leader 决定是否重试
             return {"messages": [HumanMessage(content="系统警告：上一轮请求触发了内容安全过滤，请尝试更换搜索关键词。")]}
         else:
             logger.error(f"❌ {prefix} API 请求错误: {e}")
-            return {"messages": []}
+            return {"messages": [HumanMessage(content=f"[FATAL_ERROR] 发生致命错误: {str(e)}，强制结束搜索。")]}
 
     except Exception as e:
         logger.error(f"❌ {prefix} 未知错误: {e}")
-        return {"messages": []}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# async def surfer_node(state:ResearchAgent,tools=None):
-#     """
-#     【搜索员】
-#     职责: 针对任务，进行专门的搜索
-#     """
-    # # 安全检查
-    # if not tools:
-    #     logger.error("❌ Surfer 未接收到工具！")
-    #     return {"next_node": "writer"}
-    #
-    # # 提取当前task
-    # cur_task_idx = state["cur_task_idx"]
-    # tasks = state["tasks"]
-    # task = tasks[cur_task_idx]
-    #
-    # # 边界检查
-    # if cur_task_idx >= len(tasks):
-    #     logger.warning(f"⚠️ 任务索引越界 ({cur_task_idx}/{len(task)})，强制结束搜索")
-    #     return {"next_node":"writer"}
-    #
-    # # 开始执行任务
-    # logger.info(f"🏄 [Surfer] 执行任务 {cur_task_idx + 1}/{len(tasks)}: {task}")
-    #
-    # sys_prompt = f"""你是一名全网搜索与数据抓取专家。当前时间: {datetime.now().strftime("%Y-%m-%d %H:%M")}。
-    # 你的唯一任务是调用工具来获取信息。
-    #     当前任务: "{task}"
-    #
-    #     规则：
-    #     1. 直接调用 `web_search` 工具。
-    #     2. 不要输出任何寒暄、解释或“我将为您搜索”之类的废话。
-    #     3. 这是一个自动化流程，只接收工具调用请求。
-    # """
-    # logger.info("正在搜寻相关文章...")
-    #
-    # # messages = [SystemMessage(content=sys_prompt)] + state["messages"] +  [HumanMessage(content=f"当前任务:{task},请开始执行搜索和抓取")]
-    #
-    #
-    # # 格式化消息：确保所有 ToolMessage.content 都是字符串
-    # formatted_msg = []
-    # for msg in state["messages"]:
-    #     if isinstance(msg, ToolMessage) and not isinstance(msg.content, str):
-    #         # 如果 content 是列表，转换为 JSON 字符串
-    #         formatted_msg.append(
-    #             ToolMessage(
-    #                 content=json.dumps(msg.content, ensure_ascii=False),
-    #                 tool_call_id=msg.tool_call_id,
-    #                 name=msg.name,
-    #                 id=msg.id
-    #             )
-    #         )
-    #     else:
-    #         formatted_msg.append(msg)
-    #
-    # messages = [SystemMessage(content=sys_prompt)] + formatted_msg + [HumanMessage(content=f"当前任务:{task},请开始执行搜索和抓取")]
-    #
-    #
-    #
-    # response = await llm.bind_tools(tools).ainvoke(messages)
-    #
-    # # 将返回的内容记录到当前上下文
-    # return {
-    #     "messages":[response],
-    #     "next_node":"tools"
-    # }
+        return {"messages": [HumanMessage(content=f"[FATAL_ERROR] 发生致命错误: {str(e)}，强制结束搜索。")]}
