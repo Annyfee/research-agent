@@ -98,7 +98,7 @@ class RAGStore:
         return True
 
     # RAG - 在线模块(粗排/精排/过滤)
-    def query(self, question: str,session_id:str, k_retrieve=50, k_final=6, score_threshold=0.3):
+    def query(self, question: str,session_id:str, k_retrieve=50, k_final=6, score_threshold=0.6):
         """
         检索流程: 向量粗排 -> Flashrank 精排
         粗排 - 计算数学距离（长得像就行）；
@@ -139,6 +139,7 @@ class RAGStore:
 
         # Phase 3: 过滤
         final_docs = []
+        score = []
         # 必须得分超过0.3才能返回
         for res in results:
             if res['score'] >= score_threshold:
@@ -147,11 +148,12 @@ class RAGStore:
                 # print('doc:::',doc)
                 doc.metadata['rerank_score'] = res['score']
                 # print('doc2:::',doc)
+                score.append(res['score'])
                 final_docs.append(doc)
             if len(final_docs) >= k_final:
                 break
 
-        logger.info(f"✅ [Result] 返回 {len(final_docs)} 个高分结果")
+        logger.info(f"✅ [Result] 返回 {len(final_docs)} 个高分结果 | 打分结果:{score}")
         return final_docs
 
     def clear_session(self,session_id):
