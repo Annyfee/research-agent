@@ -1,7 +1,7 @@
 # 【资料员】 整理数据:清洗数据并将其整理入库 core -> lead
 import re
 
-from langchain_core.messages import ToolMessage
+from langchain_core.messages import ToolMessage, HumanMessage
 from langchain_openai import ChatOpenAI
 from loguru import logger
 
@@ -94,7 +94,14 @@ async def core_node(state:Researcher):
                 "next_node": "leader",
             }
 
+    # 对来自surfer的报警强制拦截并交给Leader
+    if isinstance(last_msg,HumanMessage) and "[FATAL_ERROR]" in str(last_msg.HumanMessage):
+        logger.error(f"{prefix} 接收到致命错误信号，强制熔断至 Leader。")
+        return {
+            "next_node":"leader"
+        }
+
     # 非全文内容正常返回，不做拦截
     return {
-        "next_node":"surfer"
+        "next_node":"leader"
     }
