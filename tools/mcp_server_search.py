@@ -6,7 +6,7 @@ import asyncio
 from loguru import logger
 
 from ddgs import DDGS
-
+import trafilatura
 
 mcp = FastMCP("SearchService",host="0.0.0.0",port=8003)
 
@@ -46,37 +46,37 @@ async def web_search(query:str):
         logger.error(f"搜索服务出错: {e}")
         return f'搜索服务暂时不可用: {str(e)}'
 
+
 @mcp.tool()
-async def get_page_content(url:str):
+async def get_page_content(url: str):
     """
     获取单个url里的全文信息
     """
     logger.info(f'⚡ [Async] 正在抓取: {url}')
-    real_url = f"https://r.jina.ai/{url}"
 
-    async with httpx.AsyncClient(timeout=30.0,follow_redirects=True) as client: # 自动跟随重定向
-        try:
-            headers = {"User-Agent": "Mozilla/5.0"}
-            response = await client.get(real_url,headers=headers)
-            result = response.text
-            return result
-        except httpx.TimeoutException as e:
-            return "Error:请求超时，网页响应太慢"
-        except Exception as e:
-            return f"Error:抓取时发生未知错误:{str(e)}"
+    def _fetch():
+        downloaded = trafilatura.fetch_url(url)
+        if not downloaded:
+            return "Error: 无法访问该页面"
+        result = trafilatura.extract(downloaded)
+        return result or "Error: 无法提取正文内容"
+
+    try:
+        return await asyncio.to_thread(_fetch)
+    except Exception as e:
+        return f"Error: 抓取时发生未知错误:{str(e)}"
+
 
 @mcp.tool()
-async def batch_fetch(urls:list[str]):
+async def batch_fetch(urls: list[str]):
     """
     批量获取url里的全文信息(并行)
     如果是批量获取，优先使用该工具
     """
-    print(f'正在批量获取{len(urls)}个URL的全文信息...')
+    logger.info(f'正在批量获取{len(urls)}个URL的全文信息...')
     tasks = [get_page_content(url) for url in urls]
     contents = await asyncio.gather(*tasks)
-    # 这里返回必须是str，不然工具返回接收可能因为看到的不是str而报错
     return "\n\n=== 文章分隔线 ===\n\n".join(contents)
-
 
 
 if __name__ == '__main__':
