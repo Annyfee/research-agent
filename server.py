@@ -13,8 +13,18 @@ from pydantic import BaseModel
 from starlette.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
+from config import LANGCHAIN_API_KEY
 from graph import build_graph
 from tools.utils import parse_langgraph_event
+
+
+
+# 追踪
+os.environ["LANGCHAIN_TRACING_V2"] = "true"  # 总开关，决定启用追踪功能
+os.environ["LANGCHAIN_PROJECT"] = "research-agent"  # 自定义项目名
+os.environ["LANGCHAIN_API_KEY"] = LANGCHAIN_API_KEY
+
+
 
 # --- 消音代码 --- 等级低于Warning的提示全部屏蔽
 logging.getLogger("httpx").setLevel(logging.WARNING)
