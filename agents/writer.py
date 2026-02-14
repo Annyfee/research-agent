@@ -2,7 +2,8 @@
 # 总流程: manager() -  planner(确认搜索方向) - surfer(开始搜寻) - core(数据入库) - leader(对数据做检查，是否进行第二轮检索) - writer(生成报告)
 from datetime import datetime
 
-from langchain_core.messages import HumanMessage, SystemMessage
+import openai
+from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from langchain_openai import ChatOpenAI
 from loguru import logger
 
@@ -25,7 +26,7 @@ async def writer_node(state:ResearchAgent):
     """
     logger.info("✍️ [Writer] 正在构建上下文并撰写报告...")
 
-    # 暴力检索
+    # 检索rag数据
     content_blocks = []
     tasks = state.get("tasks",[])
 
@@ -42,12 +43,23 @@ async def writer_node(state:ResearchAgent):
 
     full_context_str= "\n".join(content_blocks)
 
+    # 提取最近的历史上下文(这里不直接使用state["messages"][-10:] 还特地转换格式，是为了将其给llm读，而不是直接用invoke的语法)
+    chat_history = []
+    for message in state["messages"][-5:]:
+        role = "用户" if message.type == "human" else "AI"
+        chat_history.append(f'{role}:{message.content}')
+    history_str = "\n".join(chat_history)
+
 
 
     sys_prompt = f"""你是一名世界顶级的行业研究分析师（类似于麦肯锡或高盛的首席分析师）。
         当前日期: {datetime.now().strftime("%Y-%m-%d")}
 
-        你的任务是根据提供的【调研资料】，撰写一份逻辑严密、数据详实、极具洞察力的**深度研究报告**。
+        ### 🎯 【你的核心目标】
+        请结合用户的【历史对话上下文】，针对用户的最新需求，基于【调研资料】撰写深度报告。
+        
+        ### 📜 用户的历史对话上下文:
+        {history_str}
 
         ### 🚫 严格约束:
         1. **基于事实**: 所有的分析必须基于下文提供的【调研资料】。严禁编造数据或引用不存在的来源。
@@ -85,10 +97,7 @@ async def writer_node(state:ResearchAgent):
         以下是必须基于的【调研资料】:
         {full_context_str}
         """
-    message = [
-        SystemMessage(content=sys_prompt),
-        HumanMessage(content="请开始撰写报告")
-    ]
+    message = [SystemMessage(content=sys_prompt)]
     try:
         response = await llm.ainvoke(message)
         logger.success("✅ [Writer] 报告撰写完成")
@@ -100,7 +109,17 @@ async def writer_node(state:ResearchAgent):
             # "research_notes": response.content,
             "messages":[response]
         }
+    # AI的api可能会拒绝生成内容，需要做防护
+    except openai.BadRequestError as e:
+        # 捕获 llm 的内容风控错误
+        err_dict = e.body or {}
+        if "Content Exists Risk" in str(err_dict):
+            logger.error(f"🚫 [Writer] 触发内容风控，内容无法生成")
+            # 告知风控
+            return {"messages":[AIMessage(content="⚠️ 抱歉，由于内容安全策略，我无法生成关于该主题的详细报告。请尝试更换关键词。")]}
+        else:
+            logger.error(f"❌ API 请求错误: {e}")
+            return {"messages": [AIMessage(content=f"❌ API 请求错误: {e}")]}
     except Exception as e:
-            logger.error(f"❌ Writer 生成失败: {e}")
-            # return {"research_notes": "报告生成失败，请检查日志。"}
-            return {}
+        logger.error(f"❌ 未知错误: {e}")
+        return {"messages": [AIMessage(content=f"⚠️ 系统运行异常，请检查日志。错误详情: {str(e)}")]}
