@@ -1,7 +1,7 @@
 # 【前台】 分析话术，选择是否传递当前任务，还是判定用户在闲聊，不往后启动。
 from datetime import datetime
 
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import SystemMessage, AIMessage
 from langchain_openai import ChatOpenAI
 from loguru import logger
 
@@ -82,6 +82,13 @@ async def manager_node(state:ResearchAgent):
                 "messages":[response]
             }
     except Exception as e:
+        # 针对 400 风控错误的特殊处理
+        if "Content Exists Risk" in str(e):
+            logger.error(f"🛡️ Manager 触发内容风控，拦截敏感话题。")
+            return {
+                "main_route": "end_chat",  # 👈 强制走结束路由，不再移交 Planner
+                "messages": [AIMessage(content="⚠️ 抱歉，该话题涉及敏感内容，为了系统安全，研究程序已自动拦截。")]
+            }
         logger.error(f"Manager 决策异常: {e}")
         # 遇到错误保守起见，当做闲聊处理，避免死循环
-        return {"next_node": "end"}
+        return {"next_node": "end_chat"}

@@ -1,7 +1,6 @@
 import json
 
 from langchain_core.messages import ToolMessage
-from redis.commands.search.reducers import tolist
 
 
 # 注:LangChain会将ToolMessage调整为list类型，但部分llm(如deepseek)只能接收str。所以我们需要中间件来处理
@@ -33,7 +32,7 @@ def parse_langgraph_event(event):
     """
     kind = event["event"]
 
-    # 1.LLM吐字
+    # LLM吐字
     if kind == "on_chat_model_stream":
         chunk = event["data"]["chunk"]
         if chunk.content:
@@ -41,6 +40,7 @@ def parse_langgraph_event(event):
                 "type":"token",
                 "content":chunk.content
             }
+    # 工具调用
     elif kind == "on_tool_start":
         tool_name = event["name"]
         # 防止内部方法
@@ -56,6 +56,7 @@ def parse_langgraph_event(event):
                 "tool":tool_name,
                 "input":clean_input
             }
+    # 调用结束
     elif kind == "on_tool_end":
         tool_name = event["name"]
         if not tool_name.startswith("_"):
@@ -65,4 +66,18 @@ def parse_langgraph_event(event):
                 "tool":tool_name,
                 "output":output[:200] + "..." if len(output) > 200 else output
             }
+    # 节点执行完成后触发(return结束)
+    elif kind == "on_chain_end":
+        node_name = event["name"]
+        # 只有writer节点需要返回完整message，manager节点通过流式token输出
+        if node_name in ["writer","manager"]:
+            output = event["data"]["output"]
+            messages = output.get("messages", [])
+            if messages:  # 防止列表为空
+                content = messages[-1].content
+                if content:  # 防止空消息
+                    return {
+                        "type": "message",
+                        "content": content
+                    }
     return None

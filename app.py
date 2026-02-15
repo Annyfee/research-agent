@@ -162,14 +162,16 @@ if prompt:
             if data["type"] == "token":
                 full_response += data["content"]
                 # 去掉思考文本
-                if any(x in full_response for x in ["CALL_SWARM", '"tasks"', '"task"', "{", "}","<｜DSML"]):
-                    response_placeholder.empty() # 隐藏占位符
+                if any(x in full_response for x in ["CALL_SWARM", '"tasks"', '"task"']):
+                    # 不要用 .empty()，而是显示一个友好的提示，占住位置
+                    response_placeholder.markdown("🔍 *正在识别需求并准备研究计划...*")
                     # 翻译planner
                     if "tasks" in full_response and "}" in full_response:
                         status_container.info("🧠 规划员已完成任务拆解，正在分发搜索指令...")
                         full_response = ""
+                        response_placeholder.markdown("正在为您搜寻资料,请耐心等待...")
                 else:
-                    # 正常报告
+                # 正常报告
                     response_placeholder.markdown(full_response + "▌")
             # 工具调用
             elif data["type"] == "tool_start":
@@ -193,9 +195,9 @@ if prompt:
                 tool_logs.append({"name":tool_name,"input":tool_input})
             # 防止无信息(报错)返回
             elif data["type"] == "message":
-                if not full_response:
-                    full_response = data["content"]
-                    response_placeholder.markdown(full_response)
+                # if not full_response:
+                full_response = data["content"]
+                response_placeholder.markdown(full_response)
             # 错误信息
             elif data["type"] == "error":
                 st.error(f"后端错误:{data['content']}")

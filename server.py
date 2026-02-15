@@ -120,10 +120,13 @@ async def event_generator(inputs:dict,config:dict):
                 if data:
                     # 返回SSE协议格式数据
                     yield f"data:{json.dumps(data,ensure_ascii=False)}\n\n"
-
         except Exception as e:
+            err_str = str(e)
+            # 如果是风控导致的后续崩溃，直接给用户看人话
+            if "Content Exists Risk" in err_str or "No AIMessage found" in err_str:
+                err_str = "⚠️ 系统安全策略拦截：该话题无法继续研究。"
             logger.error(f"❌ 运行出错: {e}")
-            error_data = {"type":"error","content":str(e)}
+            error_data = {"type":"error","content":err_str}
             yield f"data:{json.dumps(error_data,ensure_ascii=False)}\n\n"
 
 

@@ -3,7 +3,7 @@ import json
 from datetime import datetime
 
 import openai
-from langchain_core.messages import SystemMessage, HumanMessage, ToolMessage
+from langchain_core.messages import SystemMessage, HumanMessage, ToolMessage, AIMessage
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain_openai import ChatOpenAI
 from langgraph.graph import MessagesState
@@ -133,11 +133,11 @@ async def surfer_node(state:Researcher,tools=None):
         if "Content Exists Risk" in str(err_dict):
             logger.error(f"🚫 {prefix} 触发内容风控，强制跳过当前轮次。")
             # 返回一个由 Human 构造的 System 提示，假装这一步失败了，让 Leader 决定是否重试
-            return {"messages": [HumanMessage(content="系统警告：上一轮请求触发了内容安全过滤，请尝试更换搜索关键词。")]}
+            return {"messages": [AIMessage(content="⚠️ [安全拦截] 该话题涉及敏感内容，无法继续执行检索。")]}
         else:
             logger.error(f"❌ {prefix} API 请求错误: {e}")
-            return {"messages": [HumanMessage(content=f"[FATAL_ERROR] 发生致命错误: {str(e)}，强制结束搜索。")]}
+            return {"messages": [AIMessage(content=f"[FATAL_ERROR] 发生致命错误: {str(e)}，强制结束搜索。")]}
 
     except Exception as e:
         logger.error(f"❌ {prefix} 未知错误: {e}")
-        return {"messages": [HumanMessage(content=f"[FATAL_ERROR] 发生致命错误: {str(e)}，强制结束搜索。")]}
+        return {"messages": [AIMessage(content=f"[FATAL_ERROR] 发生致命错误: {str(e)}，强制结束搜索。")]}
