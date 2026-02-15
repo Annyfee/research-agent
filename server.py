@@ -43,6 +43,15 @@ for path in ["logs","db"]:
 # 创建日志
 logger.add("logs/server.log",rotation="10 MB")
 
+
+from collections import defaultdict
+from fastapi.responses import JSONResponse
+import time
+
+# 限流存储（内存级别，重启清零，够用） - 不存在key 自动创建空list
+request_counts = defaultdict(list)
+
+
 # 全局限流器 - 只有5个会话会运行
 MAX_CONCURRENT_USERS = asyncio.Semaphore(5)
 
@@ -125,6 +134,19 @@ async def chat_endpoint(request:ChatRequest): # 其中sid与message都是从前�
     # 获取session_id
     sid = request.session_id or str(uuid.uuid4())
     logger.info(f"收到请求 | Session: {sid}")
+
+    # 限流检查
+    now = time.time()
+    request_counts[sid] = [t for t in request_counts[sid] if now - t < 3600]  # 清理一小时前的记录
+    if len(request_counts[sid]) >= 6: # 超过六次拒绝
+        logger.warning(f"🚫 限流触发 | Session: {sid}")
+        return JSONResponse(
+            status_code=429,
+            content={"detail":"每小时最多访问6次，请稍后再试!"}
+        )
+    request_counts[sid].append(now)
+
+
     # 构造config(为数据库指明会话)
     config = {
         "configurable":{"thread_id":sid},

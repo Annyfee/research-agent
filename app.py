@@ -53,6 +53,9 @@ def stream_from_backend(user_input,session_id):
             json={"message":user_input,"session_id":session_id},
             stream=True
         ) as response:
+            # 检测限流
+            if response.status_code == 429:
+                yield {"type": "error", "content": "⚠️ 每小时最多使用6次，请稍后再试"}
 
             if response.status_code != 200:
                 yield {"type": "error", "content": f"服务器报错: {response.status_code}"}
