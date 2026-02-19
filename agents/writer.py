@@ -7,14 +7,14 @@ from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from langchain_openai import ChatOpenAI
 from loguru import logger
 
-from config import OPENAI_API_KEY
+from config import OPENAI_API_KEY, OPENAI_BASE_URL
 from state import ResearchAgent
 from tools.registry import global_rag_store
 
 llm = ChatOpenAI(
-    model="deepseek-chat",
+    model="deepseek-v3.2-chat",
     api_key=OPENAI_API_KEY,
-    base_url="https://api.deepseek.com",
+    base_url=OPENAI_BASE_URL,
     temperature=0.5
 )
 
@@ -106,7 +106,7 @@ async def writer_node(state:ResearchAgent):
         logger.info(f"🧹 [Writer] 任务完成，清理 Session: {session_id}")
 
         return {
-            # "research_notes": response.content,
+            "final_answer":response.content,
             "messages":[response]
         }
     # AI的api可能会拒绝生成内容，需要做防护
@@ -116,10 +116,22 @@ async def writer_node(state:ResearchAgent):
         if "Content Exists Risk" in str(err_dict):
             logger.error(f"🚫 [Writer] 触发内容风控，内容无法生成")
             # 告知风控
-            return {"messages":[AIMessage(content="⚠️ 抱歉，由于内容安全策略，我无法生成关于该主题的详细报告。请尝试更换关键词。")]}
+            msg = "⚠️ 抱歉，由于内容安全策略，我无法生成关于该主题的详细报告。请尝试更换关键词。"
+            return {
+                "final_answer":msg,
+                "messages":[AIMessage(content=msg)]
+            }
         else:
             logger.error(f"❌ API 请求错误: {e}")
-            return {"messages": [AIMessage(content=f"❌ API 请求错误: {e}")]}
+            msg = f"❌ API 请求错误: {e}"
+            return {
+                "final_answer":msg,
+                "messages": [AIMessage(content=msg)]
+            }
     except Exception as e:
         logger.error(f"❌ 未知错误: {e}")
-        return {"messages": [AIMessage(content=f"⚠️ 系统运行异常，请检查日志。错误详情: {str(e)}")]}
+        msg = f"⚠️ 系统运行异常，请检查日志。错误详情: {str(e)}"
+        return {
+            "final_answer":msg,
+            "messages": [AIMessage(content=msg)]
+        }
