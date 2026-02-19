@@ -30,7 +30,7 @@ from langgraph.graph import StateGraph, MessagesState, START, END
 from langgraph.prebuilt import ToolNode
 from loguru import logger
 
-from config import OPENAI_API_KEY, LANGCHAIN_API_KEY
+from config import OPENAI_API_KEY, LANGCHAIN_API_KEY, OPENAI_BASE_URL
 from tools.stream import run_agent_with_streaming
 
 os.environ["LANGCHAIN_TRACING_V2"] = "true"  # 总开关，决定启用追踪功能
@@ -152,7 +152,7 @@ def build_graph(available_tools):
     llm = ChatOpenAI(
         model="deepseek-chat",
         api_key=OPENAI_API_KEY,
-        base_url="https://api.deepseek.com",
+        base_url=OPENAI_BASE_URL,
         streaming=True
     )
 
