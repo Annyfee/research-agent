@@ -12,12 +12,6 @@ from tools.registry import global_rag_store
 
 
 
-# llm = ChatOpenAI(
-#     model="deepseek-chat",
-#     api_key=OPENAI_API_KEY,
-#     base_url="https://api.deepseek.com",
-#     temperature=0.4
-# )
 
 async def core_node(state:Researcher):
     """
