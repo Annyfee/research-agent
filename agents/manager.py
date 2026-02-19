@@ -5,15 +5,15 @@ from langchain_core.messages import SystemMessage, AIMessage
 from langchain_openai import ChatOpenAI
 from loguru import logger
 
-from config import OPENAI_API_KEY
+from config import OPENAI_API_KEY, OPENAI_BASE_URL
 from state import ResearchAgent
 from tools.utils import clean_msg_for_deepseek
 
 # llm每次初始化放在外面，避免每次连接都重新调用
 llm = ChatOpenAI(
-    model="deepseek-chat",
+    model="deepseek-v3.2-chat",
     api_key=OPENAI_API_KEY,
-    base_url="https://api.deepseek.com",
+    base_url=OPENAI_BASE_URL,
     temperature=0
 )
 
@@ -91,4 +91,4 @@ async def manager_node(state:ResearchAgent):
             }
         logger.error(f"Manager 决策异常: {e}")
         # 遇到错误保守起见，当做闲聊处理，避免死循环
-        return {"next_node": "end_chat"}
+        return {"next_node": "end_chat","messages":[AIMessage(content="⚠️ 系统暂时异常，请稍后重试。")]}
