@@ -41,19 +41,3 @@ async def leader_node(state:Researcher):
         "retry_count": cur_retry + 1,
         "next_node": "surfer"  # 明确指令：回 Surfer
     }
-
-
-
-    # cur_task_idx = state.get("cur_task_idx",0)
-    # # 工作未完成
-    # if cur_task_idx < len(state["tasks"]):
-    #     return {
-    #         "next_node":"surfer"
-    #     }
-    # # 工作已完成
-    # else:
-    #     return {
-    #         "next_node":"writer"
-    #     }
-    # 作为简单节点过渡，等待所有surfer/core任务完成后，由此节点统一流转到writer
-    # return {}
