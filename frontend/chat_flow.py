@@ -1,150 +1,10 @@
-# Streamlit前端UI配置
-import json
-import uuid
+# 处理对话时逻辑
 
 import streamlit as st
-import requests
+from frontend.backend_client import stream_from_backend
 
 
-
-# 页面基础配置
-st.set_page_config(
-    page_title="深度搜索智能体",
-    page_icon="🔎",
-    layout="wide",
-    initial_sidebar_state="expanded" # 初始侧边栏展开
-)
-
-# CSS美化
-st.markdown("""
-<style>
-    /* 聊天气泡样式 */
-    .stChatMessage {
-        padding: 1.5rem;
-        border-radius: 12px;
-        margin-bottom: 1rem;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-    }
-    /* 状态容器样式 (显示工具调用) */
-    [data-testid="stStatusWidget"] {
-        border: 1px solid #e0e0e0;
-        border-radius: 8px;
-        background-color: #f9f9f9;
-    }
-</style>
-""",unsafe_allow_html=True) # 允许渲染
-
-
-
-# 不使用next_asyncio.run() -- 因为我们复杂的异步逻辑已经丢给了Docker里的FastAPI后端
-
-
-
-# 处理SSE协议的工具函数
-def stream_from_backend(user_input,session_id):
-    """
-    连接docker后端，并把复杂的数据流按SSE协议解析成简单的Py对象
-    """
-    # docker后端地址
-    api_url = "http://localhost:8011/chat"
-    try:
-        with requests.post(
-            api_url,
-            json={"message":user_input,"session_id":session_id},
-            stream=True
-        ) as response:
-            # 检测限流
-            if response.status_code == 429:
-                yield {"type": "error", "content": "⚠️ 每小时最多使用6次，请稍后再试"}
-                return
-
-            if response.status_code != 200:
-                yield {"type": "error", "content": f"服务器报错: {response.status_code}"}
-                return
-
-            # 逐行监听
-            for line in response.iter_lines(): # iter_lines:切片模式，(发现换行)立刻切走
-                if line:
-                    decoded_line = line.decode("utf-8")
-                    if decoded_line.startswith("data:"):
-                        json_str = decoded_line[5:].strip()
-                        if not json_str:
-                            continue
-                        if "[DONE]" in json_str:
-                            break # 结束
-                        try:
-                            yield json.loads(json_str)
-                        except Exception:
-                            pass
-    except Exception as e:
-        yield {"type":"error","content":f"连接失败:{str(e)}"}
-
-# 状态初始化
-if "session_id" not in st.session_state:
-    st.session_state.session_id = str(uuid.uuid4())
-
-# 用message列表用来存结果
-if "message" not in st.session_state:
-    st.session_state.message = []
-
-# 侧边栏
-with st.sidebar:
-    st.header("🔬 研究控制台")
-    st.caption(f"Session ID:{st.session_state.session_id}")
-
-    # 检测后端联通
-    try:
-        if requests.get("http://localhost:8011/docs").status_code == 200:
-            st.success("🟢 后端服务在线")
-            try:
-                requests.get("http://localhost:8003",timeout=1)
-                st.success("🟢 MCP服务在线")
-            except:
-                st.warning("⚪ MCP服务未启动 (端口8003不通)")
-    except:
-        st.error("🔴 后端服务离线(请启动docker)")
-
-    st.divider()
-
-    # 历史记录管理
-    col1,col2 = st.columns(2) # 侧边栏分两列
-    with col1:
-        if st.button("🧹 新对话",use_container_width=True):
-            st.session_state.session_id = str(uuid.uuid4())
-            st.session_state.message = []
-            st.rerun()
-    st.info("""
-    **架构说明**：
-    - **Frontend**: Streamlit (UI/交互)
-    - **Backend**: FastAPI + LangGraph (Docker容器)
-    - **Protocol**: HTTP + SSE 流式传输
-    """)
-
-# 主界面:渲染历史消息
-st.title("🔎 Deep Research Agent")
-st.caption("基于 LangGraph 多智能体架构 | Docker 容器化部署")
-
-# 遍历历史记录并将其渲染
-for msg in st.session_state.message:
-    role = "user" if msg["role"] == "user" else "assistant"
-    avatar = "👤" if role == "user" else "🤖"
-
-    with st.chat_message(role,avatar=avatar):
-        # 有工具日志，则渲染
-        if "steps" in msg and msg["steps"]:
-            with st.status("✅ 历史思考过程", state="complete", expanded=False) as status:
-                for step in msg["steps"]:
-                    st.write(f"🔨 调用工具: **{step['name']}**")
-                    with status.expander("查看参数详情:"):
-                        st.json(step['input'])
-
-        # 再渲染正文
-        st.markdown(msg["content"])
-
-
-# 处理用户输入(核心)
-prompt = st.chat_input("请输入你的研究课题...")
-if prompt:
+def handle_chat_turn(prompt):
     # A.显示用户提问
     with st.chat_message("user",avatar="👤"):
         st.markdown(prompt)
@@ -205,24 +65,6 @@ if prompt:
 
                 # 其他节点token直接忽略
                 continue
-
-
-                # # 去掉思考文本
-                # if not has_final_answer and source == "manager" and any(x in full_response for x in ["CALL_SWARM", '"tasks"', '"task"']):
-                #     # 不要用 .empty()，而是显示一个友好的提示，占住位置
-                #     response_placeholder.markdown("🔍 *正在识别需求并准备研究计划...*")
-                #     # 翻译planner
-                #     if "tasks" in full_response and "}" in full_response:
-                #         status_container.info("🧠 规划员已完成任务拆解，正在分发搜索指令...")
-                #         full_response = ""
-                #         response_placeholder.markdown("正在为您搜寻资料,请耐心等待...")
-                # # writer阶段(最终报告)
-                # else:
-                #     if source == "writer":
-                #         has_final_answer = True
-                #     response_placeholder.markdown(full_response + "▌")
-
-
 
 
             # 工具调用
