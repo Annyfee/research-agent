@@ -13,7 +13,8 @@ def stream_from_backend(user_input,session_id):
         with requests.post(
             api_url,
             json={"message":user_input,"session_id":session_id},
-            stream=True
+            stream=True,
+            timeout=(3,80) # 防止无数据
         ) as response:
             # 检测限流
             if response.status_code == 429:
@@ -61,5 +62,3 @@ def check_services_status():
     except Exception:
         status["mcp_online"] = False
     return status
-
-

@@ -1,10 +1,6 @@
 # streamlit前端ui
 
-import uuid
 import streamlit as st
-
-from backend_client import check_services_status
-
 
 def setup_page():
     # 页面基础配置
@@ -34,14 +30,14 @@ def setup_page():
     </style>
     """,unsafe_allow_html=True) # 允许渲染
 
-def render_sidebar():
+def render_sidebar(status):
+    new_chat_clicked = False
     # 侧边栏
     with st.sidebar:
         st.header("🔬 研究控制台")
         st.caption(f"Session ID:{st.session_state.session_id}")
 
         # 检测后端联通
-        status = check_services_status()
         if status["backend_online"]:
             st.success("🟢 后端服务在线")
             if status["mcp_online"]:
@@ -57,15 +53,14 @@ def render_sidebar():
         col1, col2 = st.columns(2)  # 侧边栏分两列
         with col1:
             if st.button("🧹 新对话", use_container_width=True):
-                st.session_state.session_id = str(uuid.uuid4())
-                st.session_state.message = []
-                st.rerun()
+                new_chat_clicked = True
         st.info("""
         **架构说明**：
         - **Frontend**: Streamlit (UI/交互)
         - **Backend**: FastAPI + LangGraph (Docker容器)
         - **Protocol**: HTTP + SSE 流式传输
         """)
+        return new_chat_clicked
 
 def render_header():
     # 主界面:渲染历史消息
