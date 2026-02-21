@@ -40,3 +40,26 @@ def stream_from_backend(user_input,session_id):
                             pass
     except Exception as e:
         yield {"type":"error","content":f"连接失败:{str(e)}"}
+
+def check_services_status():
+    """
+    检查服务是否在线
+    """
+    status = {
+        "backend_online":False,
+        "mcp_online":False
+    }
+    try:
+        r = requests.get("http://localhost:8011/docs",timeout=1.5)
+        if r.status_code == 200:
+            status["backend_online"] = True
+    except Exception:
+        status["backend_online"] = False
+    try:
+        requests.get("http://localhost:8003",timeout=1.5)
+        status["mcp_online"] = True
+    except Exception:
+        status["mcp_online"] = False
+    return status
+
+

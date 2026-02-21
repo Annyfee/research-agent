@@ -1,8 +1,8 @@
 # 初始化配置
 import uuid
 import streamlit as st
-from frontend.chat_flow import handle_chat_turn
-from frontend.ui import setup_page, render_sidebar, render_header, render_history
+from chat_flow import handle_chat_turn
+from ui import setup_page, render_sidebar, render_header, render_history
 
 setup_page()
 

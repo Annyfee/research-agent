@@ -1,8 +1,9 @@
 # streamlit前端ui
 
 import uuid
-import requests
 import streamlit as st
+
+from backend_client import check_services_status
 
 
 def setup_page():
@@ -40,15 +41,14 @@ def render_sidebar():
         st.caption(f"Session ID:{st.session_state.session_id}")
 
         # 检测后端联通
-        try:
-            if requests.get("http://localhost:8011/docs").status_code == 200:
-                st.success("🟢 后端服务在线")
-                try:
-                    requests.get("http://localhost:8003", timeout=1)
-                    st.success("🟢 MCP服务在线")
-                except:
-                    st.warning("⚪ MCP服务未启动 (端口8003不通)")
-        except:
+        status = check_services_status()
+        if status["backend_online"]:
+            st.success("🟢 后端服务在线")
+            if status["mcp_online"]:
+                st.success("🟢 MCP服务在线")
+            else:
+                st.warning("⚪ MCP服务未启动 (端口8003不通)")
+        else:
             st.error("🔴 后端服务离线(请启动docker)")
 
         st.divider()

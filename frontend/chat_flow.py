@@ -1,7 +1,7 @@
 # 处理对话时逻辑
 
 import streamlit as st
-from frontend.backend_client import stream_from_backend
+from backend_client import stream_from_backend
 
 
 def handle_chat_turn(prompt):
