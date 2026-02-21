@@ -9,7 +9,7 @@ from loguru import logger
 
 from config import OPENAI_API_KEY, OPENAI_BASE_URL
 from state import ResearchAgent
-from tools.utils import clean_msg_for_deepseek
+from tools.utils_message import clean_msg_for_deepseek
 
 llm = ChatOpenAI(
     model="deepseek-v3.2-chat",

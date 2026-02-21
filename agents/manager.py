@@ -7,7 +7,7 @@ from loguru import logger
 
 from config import OPENAI_API_KEY, OPENAI_BASE_URL
 from state import ResearchAgent
-from tools.utils import clean_msg_for_deepseek
+from tools.utils_message import clean_msg_for_deepseek
 
 # llm每次初始化放在外面，避免每次连接都重新调用
 llm = ChatOpenAI(

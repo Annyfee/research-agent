@@ -3,7 +3,7 @@ import json
 import uuid
 import time
 from loguru import logger
-from tools.utils import parse_langgraph_event
+from tools.utils_event import parse_langgraph_event
 
 
 # 全局并发限制（最小改动：保留你原“限制最大并发数”的语义）

@@ -1,6 +1,6 @@
 import json
 
-from tools.utils import parse_langgraph_event
+from tools.utils_event import parse_langgraph_event
 
 
 async def run_agent_with_streaming(app,inputs:dict,config:dict = None):
