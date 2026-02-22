@@ -1,7 +1,14 @@
 # 处理对话时逻辑
-
+import re
 import streamlit as st
 from backend_client import stream_from_backend
+
+
+def sanitize_text(text):
+    if not text:
+        return ""
+    return re.sub(r"(?i)^\s*call_swarm[\s:-]*","",text)
+
 
 
 def handle_chat_turn(prompt):
@@ -12,33 +19,57 @@ def handle_chat_turn(prompt):
 
     # B.请求后端并流式显示
     with st.chat_message("assistant",avatar="🤖"):
-        # 俩容器:思考中、正文
-        status_container = st.status("🤔 Agent正在思考...",expanded=True)
+        # 俩容器:思考中 & 正文
+        status_placeholder = st.empty()
+        with status_placeholder.container():
+            status_container = st.status("🤔 Agent正在思考...",expanded=True)
         response_placeholder = st.empty()
         full_response = ""
+        final_response = ""
         tool_logs = []
+
+        # 判断manager状态:闲聊/分配任务
+        is_research = False
+        # 等待文本
+        shown_waiting_text = False
 
         # 调用工具函数,接收数据
         for data in stream_from_backend(prompt,st.session_state.session_id):
             content = data.get("content", "")
             event_type = data.get("type")
-
             if event_type == "phase":
-                status_container.info(content or "处理中...")
+                phase = data.get("phase","")
+                phase_map = {
+                "planning": "🧭 正在规划任务...",
+                "researching": "🔎 正在检索资料...",
+                "writing": "✍️ 正在撰写报告..."
+            }
+                msg = phase_map.get(phase,"")
+                if msg:
+                    status_container.info(msg)
                 continue
             elif event_type == "status":
-                status_container.info(content or "处理中...")
+                # 只在后端真有内容时展示
+                if content:
+                    status_container.info(content)
                 continue
             elif event_type == "token": # 流式输出
                 token_text = content if isinstance(content, str) else "" # 防止脏输出
                 full_response += token_text
-                response_placeholder.markdown(full_response)
+                final_response = sanitize_text(full_response)
+                response_placeholder.markdown(final_response)
                 continue
             elif event_type == "message": # 整段消息返回
                 if content:
                     full_response = content
-                    response_placeholder.markdown(full_response)
+                    final_response = sanitize_text(full_response)
+                    response_placeholder.markdown(final_response)
+                continue
             elif event_type == "tool_start":
+                if not shown_waiting_text:
+                    response_placeholder.markdown("正在并发搜索资料中，请耐心等待...")
+                    shown_waiting_text = True
+                is_research = True
                 tool_name = data.get("tool","unknown_tool")
                 tool_input = data.get("input",{})
                 # 存入工具列表
@@ -55,11 +86,15 @@ def handle_chat_turn(prompt):
                 break
 
         # 单次回复结束
-        status_container.update(label="✅️ 生成完毕",state="complete",expanded=False)
-        if not full_response or not full_response.strip():
-            full_response = "未生成有效内容，请重试。"
-        response_placeholder.markdown(full_response) # 显示最终文本
+        if is_research:
+            status_container.update(label="✅️ 生成完毕", state="complete", expanded=False)
+        else:
+            status_placeholder.empty()
+        if not final_response or not final_response.strip():
+            final_response = "未生成有效内容，请重试。"
+
+        # response_placeholder.markdown(sanitize_text(full_response)) # 显示最终文本
         # 最终回复记入历史
         st.session_state.message.append(
-            {"role":"assistant","content":full_response,"steps":tool_logs}
+            {"role":"assistant","content":final_response,"steps":tool_logs}
         )
