@@ -3,12 +3,22 @@ import re
 import streamlit as st
 from backend_client import stream_from_backend
 
-
+# 清洗CALL_SWARM
 def sanitize_text(text):
     if not text:
         return ""
     return re.sub(r"(?i)^\s*call_swarm[\s:-]*","",text)
 
+# 优化数据来源展示
+def format_sources_simple(text):
+    if not text:
+        return ""
+    marker = "标明数据来源"
+    if marker not in text:
+        return text
+    head,tail = text.split(marker,1)
+    tail = re.sub(r"(?<!^)\[(\d+)\]",r"\n[\1]",tail)
+    return head + marker + tail
 
 
 def handle_chat_turn(prompt):
@@ -56,13 +66,13 @@ def handle_chat_turn(prompt):
             elif event_type == "token": # 流式输出
                 token_text = content if isinstance(content, str) else "" # 防止脏输出
                 full_response += token_text
-                final_response = sanitize_text(full_response)
+                final_response = format_sources_simple(sanitize_text(full_response))
                 response_placeholder.markdown(final_response)
                 continue
             elif event_type == "message": # 整段消息返回
                 if content:
                     full_response = content
-                    final_response = sanitize_text(full_response)
+                    final_response = format_sources_simple(sanitize_text(full_response))
                     response_placeholder.markdown(final_response)
                 continue
             elif event_type == "tool_start":
