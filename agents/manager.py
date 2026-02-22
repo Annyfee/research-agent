@@ -5,13 +5,13 @@ from langchain_core.messages import SystemMessage, AIMessage
 from langchain_openai import ChatOpenAI
 from loguru import logger
 
-from config import OPENAI_API_KEY, OPENAI_BASE_URL
+from config import OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_MODEL
 from state import ResearchAgent
 from tools.utils_message import clean_msg_for_deepseek
 
 # llm每次初始化放在外面，避免每次连接都重新调用
 llm = ChatOpenAI(
-    model="deepseek-v3.2-chat",
+    model=OPENAI_MODEL,
     api_key=OPENAI_API_KEY,
     base_url=OPENAI_BASE_URL,
     temperature=0

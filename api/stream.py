@@ -59,7 +59,6 @@ def adapt_event_for_ui(data:dict,fsm_state:dict,run_id:str,sid:str):
             return out
         out.append(make_event("token",run_id,sid,source=source,content=text))
         return out
-    # message 降级成 token，共用一套渲染逻辑
     if t == "message":
         out.append(make_event("message",run_id,sid,source=source,content=text))
         return out

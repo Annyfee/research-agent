@@ -6,6 +6,7 @@ load_dotenv()
 
 
 # 2. 获取API_KEYS
+OPENAI_MODEL = os.getenv("OPENAI_MODEL")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL")
 EMBEDDING_API_KEY = os.getenv("EMBEDDING_API_KEY")
