@@ -54,14 +54,14 @@ def adapt_event_for_ui(data:dict,fsm_state:dict,run_id:str,sid:str):
             out.append(make_event(
                 "status",run_id,sid,
                 source="system",
-                content="🔍 正在识别需求并规划任务..."
+                # content="🔍 正在识别需求并规划任务..."
             ))
             return out
         out.append(make_event("token",run_id,sid,source=source,content=text))
         return out
     # message 降级成 token，共用一套渲染逻辑
     if t == "message":
-        out.append(make_event("token",run_id,sid,source=source,content=text))
+        out.append(make_event("message",run_id,sid,source=source,content=text))
         return out
     if t == "tool_start":
         out.append(make_event(

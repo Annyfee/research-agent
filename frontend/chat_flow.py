@@ -3,6 +3,12 @@ import re
 import streamlit as st
 from backend_client import stream_from_backend
 
+def judge_manager(text):
+    if not text:
+        return ""
+    return re.search(r"(?i)\bcall_swarm\b",text)
+
+
 # 清洗CALL_SWARM
 def sanitize_text(text):
     if not text:
@@ -13,7 +19,7 @@ def sanitize_text(text):
 def format_sources_simple(text):
     if not text:
         return ""
-    marker = "标明数据来源"
+    marker = "数据来源"
     if marker not in text:
         return text
     head,tail = text.split(marker,1)
@@ -42,11 +48,13 @@ def handle_chat_turn(prompt):
         is_research = False
         # 等待文本
         shown_waiting_text = False
+        manager_buffer = "" # 做流式token收集，防止所需token不足
 
         # 调用工具函数,接收数据
         for data in stream_from_backend(prompt,st.session_state.session_id):
             content = data.get("content", "")
-            event_type = data.get("type")
+            event_type = data.get("type","")
+            source = data.get("source","")
             if event_type == "phase":
                 phase = data.get("phase","")
                 phase_map = {
@@ -64,16 +72,41 @@ def handle_chat_turn(prompt):
                     status_container.info(content)
                 continue
             elif event_type == "token": # 流式输出
-                token_text = content if isinstance(content, str) else "" # 防止脏输出
-                full_response += token_text
-                final_response = format_sources_simple(sanitize_text(full_response))
-                response_placeholder.markdown(final_response)
+                if source == "writer":
+                    if content:
+                        full_response += content
+                        final_response = format_sources_simple(sanitize_text(full_response))
+                        response_placeholder.markdown(final_response)
+                elif source == "manager":
+                    # 闲聊状态正常输出
+                    if not is_research:
+                        manager_buffer += content or ""
+                        if judge_manager(manager_buffer):
+                            is_research = True
+                            full_response = "" # 防止manager文本残留
+                            final_response = ""
+                        else:
+                            if content:
+                                full_response += content
+                                final_response = format_sources_simple(sanitize_text(full_response))
+                                response_placeholder.markdown(final_response)
                 continue
             elif event_type == "message": # 整段消息返回
-                if content:
-                    full_response = content
-                    final_response = format_sources_simple(sanitize_text(full_response))
-                    response_placeholder.markdown(final_response)
+                if source == "writer":
+                    if content:
+                        full_response = content
+                        final_response = format_sources_simple(sanitize_text(full_response))
+                        response_placeholder.markdown(final_response)
+                elif source == "manager":
+                    # 闲聊状态输出
+                    if not is_research:
+                        manager_buffer += content or ""
+                        if judge_manager(manager_buffer):
+                            is_research = True
+                        else:
+                            full_response = content
+                            final_response = format_sources_simple(sanitize_text(full_response))
+                            response_placeholder.markdown(final_response)
                 continue
             elif event_type == "tool_start":
                 if not shown_waiting_text:
