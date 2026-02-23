@@ -18,6 +18,8 @@ services:
     volumes:
       - ./db:/app/db
       - ./logs:/app/logs
+      - ./models:/app/models
+      - ./chroma_db:/app/chroma_db
     env_file:
       - .env
 
