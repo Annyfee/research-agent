@@ -14,7 +14,7 @@ def stream_from_backend(user_input,session_id):
             api_url,
             json={"message":user_input,"session_id":session_id},
             stream=True,
-            timeout=(3,150) # 防止无数据
+            timeout=(3,300) # 防止无数据
         ) as response:
             # 检测限流
             if response.status_code == 429:
