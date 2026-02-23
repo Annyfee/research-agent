@@ -1,3 +1,6 @@
+# LLM模型
+OPENAI_MODEL=your_openai_model
+
 # LLM密钥
 OPENAI_API_KEY=your_openai_api_key
 

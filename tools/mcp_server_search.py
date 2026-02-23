@@ -11,6 +11,12 @@ import trafilatura
 mcp = FastMCP("SearchService",host="0.0.0.0",port=8003)
 
 
+SINGLE_FETCH_TIMEOUT_SEC = 25 # 单URL超时
+BATCH_FETCH_TIMEOUT_SEC = 90 # 批量总超时
+MAX_BATCH_CONCURRENCY = 3 # 批量并发上限
+
+
+
 # headers = {
 #     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 # }
@@ -62,7 +68,14 @@ async def get_page_content(url: str):
         return result or "Error: 无法提取正文内容"
 
     try:
-        return await asyncio.to_thread(_fetch)
+        # 单URL超时兜底
+        return await asyncio.wait_for(
+            asyncio.to_thread(_fetch),
+            timeout=SINGLE_FETCH_TIMEOUT_SEC
+        )
+    except asyncio.TimeoutError:
+        logger.warning(f"⏰ 单URL抓取超时: {url}")
+        return f"Error: 抓取超时（>{SINGLE_FETCH_TIMEOUT_SEC}s）: {url}"
     except Exception as e:
         return f"Error: 抓取时发生未知错误:{str(e)}"
 
@@ -74,10 +87,24 @@ async def batch_fetch(urls: list[str]):
     如果是批量获取，优先使用该工具
     """
     logger.info(f'正在批量获取{len(urls)}个URL的全文信息...')
-    tasks = [get_page_content(url) for url in urls]
-    contents = await asyncio.gather(*tasks)
-    return "\n\n=== 文章分隔线 ===\n\n".join(contents)
-
+    sem = asyncio.Semaphore(MAX_BATCH_CONCURRENCY)
+    async def fetch_one(url:str):
+        async with sem:
+            try:
+                return await asyncio.wait_for(
+                    get_page_content(url),
+                    timeout=SINGLE_FETCH_TIMEOUT_SEC
+                )
+            except Exception as e:
+                return f"Error: {url} 抓取失败: {e}"
+    try:
+        results = await asyncio.wait_for(
+            asyncio.gather(*(fetch_one(url) for url in urls)),
+            timeout=BATCH_FETCH_TIMEOUT_SEC
+        )
+    except asyncio.TimeoutError:
+        return "Error: 批量抓取超时，请减少URL数量后重试。"
+    return "\n\n=== 文章分隔线 ===\n\n".join(results)
 
 if __name__ == '__main__':
     mcp.run("streamable-http")

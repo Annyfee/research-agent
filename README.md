@@ -1,155 +1,156 @@
 # 🕵️ Deep Research Agent (WIP)
 
-> **基于 LangGraph 与 MCP 架构的分布式深度研究智能体集群**  
-> *An Autonomous Research Swarm based on Map-Reduce Architecture*
-
-![Status](https://img.shields.io/badge/Status-Active_Development-orange)
-![Python](https://img.shields.io/badge/Python-3.10+-blue)
-![LangGraph](https://img.shields.io/badge/LangGraph-0.2+-green)
-![Architecture](https://img.shields.io/badge/Architecture-Map--Reduce-purple)
-
+> 基于 **LangGraph + MCP + FastAPI(SSE)** 的多智能体深度研究系统  
+> A Multi-Agent Deep Research System with graph orchestration and streaming backend.
+!Status [<sup>1</sup>](https://img.shields.io/badge/Status-Pre--Alpha-orange)
+!Python [<sup>2</sup>](https://img.shields.io/badge/Python-3.10+-blue)
+!LangGraph [<sup>3</sup>](https://img.shields.io/badge/LangGraph-StateGraph-green)
+!Protocol [<sup>4</sup>](https://img.shields.io/badge/Protocol-MCP-purple)
 ---
-
-## ⚠️ Current Status: Pre-Alpha (Demo Ready)
-
-本项目目前处于 **核心逻辑跑通 (Core Logic Verified)** 阶段。  
-主要展示了 **LangGraph 状态机编排**、**MCP 工具协议** 以及 **Asyncio 高并发采集** 的最小可行性实现 (MVP)。  
-
-后端服务化 (FastAPI)、多用户隔离及容器化部署 (Docker) 正在紧锣密鼓地开发中。
-
+## ✨ 项目亮点
+- 🧠 **Graph-native Multi-Agent**：基于 LangGraph 的可扩展状态机编排（非线性链路）
+- ⚡ **并发研究执行**：Planner 拆分任务，Researcher 子图并行搜索与抓取
+- 🔌 **MCP 工具解耦**：搜索能力服务化，Agent 与工具边界清晰
+- 🌊 **流式可观测输出**：FastAPI + SSE 实时推送 phase / token / tool 事件
+- 🖥️ **端到端可运行**：后端 API + Streamlit 前端完整打通
+- 🧩 **会话隔离能力**：`session_id` 接入主链路，支持多会话并行使用
 ---
-
-## 📖 项目简介 (Introduction)
-
-传统的 LLM 对话往往受限于“幻觉”和“训练数据滞后”。  
-**Deep Research Agent** 不仅仅是一个聊天机器人，它是一个模仿人类高级研究员工作流的**智能体集群**。
-
-它采用 **Map-Reduce** 分布式架构：
-
-1. **Planner** 将模糊的课题拆解为多个并行子任务  
-2. **Surfer Swarm** (搜索集群) 并发执行全网搜索与爬取  
-3. **Core** 进行实时的 ETL (清洗、切片、向量化)  
-4. **Writer** 基于 RAG 知识库生成万字深度报告
-
-## 🌟 核心特性 (Key Features)
-
-### 1. 🧠 Agentic Map-Reduce 架构
-摒弃线性的 Chain 结构，采用 **LangGraph** 构建有环图。
-
-- **动态规划**：Planner 根据上下文自动拆解 3-5 个搜索方向  
-- **自我纠错**：Manager 节点具备意图识别能力，自动拦截闲聊，仅对复杂任务启动研究集群
-
-### 2. ⚡ 异步高并发采集 (Async High-Concurrency)
-
-- 解决了 Python GIL 下的 I/O 阻塞痛点  
-- 基于 `httpx` 和 `asyncio` 实现 **5+ Agent 并行作业**  
-- 单次深度研究任务（含 20+ 网页抓取）从传统串行的 10 分钟压缩至 **1-2 分钟**
-
-### 3. 🔌 MCP 标准化协议 (Model Context Protocol)
-
-- 遵循 2025 前沿标准，通过 `fastmcp` 构建独立的搜索微服务  
-- 实现了 Agent 逻辑与工具实现的彻底解耦，易于扩展
-
-### 4. 🧹 实时 Web RAG 管道
-
-- **ETL Pipeline**：`Jina Reader` (解析) → `Regex` (降噪) → `RecursiveSplitter` (切片)  
-- **Hybrid Search**：集成 ChromaDB 向量检索与 Flashrank 重排序 (Rerank)，大幅降低幻觉率
-
+## 📖 项目简介
+传统 LLM 对话在复杂课题上容易出现信息滞后和幻觉。  
+本项目尝试用 **多智能体 + 工具调用 + RAG** 的方式，模拟“研究团队”工作流：
+1. **Manager** 判断是闲聊还是研究任务  
+2. **Planner** 拆分可并发执行的研究子任务  
+3. **Researcher 子图** 并发搜索与网页抓取  
+4. **Core/RAG** 做清洗、切片、召回  
+5. **Writer** 汇总生成最终回答
 ---
-
-
-## 🗺️ 架构设计 (Architecture)
-
+## 🧩 核心架构（当前实现）
 ```mermaid
 graph TD
-    User(用户指令) --> Manager{Manager<br>意图识别}
-    Manager -- 闲聊/追问 --> DirectReply(直接回复)
-    Manager -- 深度研究 --> Planner(Planner<br>任务拆解)
-
-    subgraph "Parallel Execution (Map)"
-        Planner --> Surfer1(Surfer #1<br>广度搜索)
-        Planner --> Surfer2(Surfer #2<br>深度抓取)
-        Planner --> Surfer3(Surfer #3<br>多维验证)
-    end
-
-    Surfer1 & Surfer2 & Surfer3 --> Core(Core ETL<br>清洗入库)
-    Core --> RAG[(ChromaDB<br>临时知识库)]
-    RAG --> Writer(Writer<br>Reduce/报告生成)
-    Writer --> End(最终交付)
+    U[User] --> M[Manager]
+    M -->|end_chat| E[END]
+    M -->|planner| P[Planner]
+    P --> R1[Researcher Subgraph #1]
+    P --> R2[Researcher Subgraph #2]
+    P --> R3[Researcher Subgraph #3]
+    R1 --> W[Writer]
+    R2 --> W
+    R3 --> W
+    W --> E
 ```
-
-## 🛠️ 技术栈 (Tech Stack)
-
-- **Orchestration**: LangGraph, LangChain
-- **LLM Integration**: DeepSeek-V3 (via OpenAI Compatible API)
-- **Protocol**: Model Context Protocol (MCP)
-- **Search & Data**: DuckDuckGo (Async), Jina Reader, ChromaDB, Flashrank
-- **Concurrency**: Asyncio, Httpx
-
-## 📂 项目结构 (Project Structure)
-
-```plaintext
-deep-research-agent/
-├── agents/                    # 智能体定义
-│   ├── manager.py            # 前台经理 (意图识别)
-│   ├── planner.py            # 规划师 (任务拆解)
-│   ├── surfer.py             # 冲浪者 (执行搜索)
-│   ├── core.py               # 数据工程师 (ETL入库)
-│   └── writer.py             # 撰稿人 (报告生成)
-├── tools/                     # 工具与基础设施
-│   ├── mcp_server_search.py  # MCP搜索微服务
-│   ├── rag_store.py          # RAG 向量库封装
-│   └── utils.py              # 通用中间件
-├── main.py                    # 系统入口 (控制台交互版)
-├── config.py                  # 全局配置
-└── requirements.txt           # 依赖清单
+---
+```text
+research-agent/
+├── agents/
+│   ├── manager.py
+│   ├── planner.py
+│   ├── writer.py
+│   └── researcher/
+│       ├── graph.py
+│       ├── leader.py
+│       ├── surfer.py
+│       ├── core.py
+│       └── state.py
+├── api/
+│   ├── routes.py
+│   └── stream.py
+├── bootstrap/
+│   └── lifespan.py
+├── frontend/
+│   ├── app.py
+│   ├── chat_flow.py
+│   ├── backend_client.py
+│   └── ui.py
+├── tools/
+│   ├── mcp_server_search.py
+│   ├── mcp_manager.py
+│   ├── rag_store.py
+│   ├── registry.py
+│   ├── utils_event.py
+│   └── utils_message.py
+├── graph.py
+├── state.py
+├── server.py
+├── main.py
+├── config.py
+├── requirements.txt
+├── Dockerfile
+└── docker-compose.yml
 ```
+---
+## 🛠️ 技术栈
+- Orchestration: LangGraph, LangChain
+- Backend API: FastAPI + SSE
+- Frontend: Streamlit
+- Tool Protocol: MCP (fastmcp)
+- Web Search / Crawl: DDGS, Trafilatura
+- RAG: ChromaDB + rerank模型（本地模型目录 models/）
+- Concurrency: asyncio
 
-## 🚧 开发路线图 (Roadmap)
+---
 
-- [x] v0.1 Core: 完成 LangGraph 闭环，跑通 Map-Reduce 流程
-- [x] v0.2 Performance: 实现 mcp_server 的全异步改造，解决并发阻塞
-- [x] v0.3 Intelligence: 优化 Manager 意图识别，防止非任务指令误触
-- [x] v0.4 Isolation (In Progress): 实现基于 session_id 的多用户 RAG 隔离
-- [x] v0.5 Backend: 封装 FastAPI 接口，支持 SSE 流式输出
-- [ ] v0.6 Frontend: 集成 Streamlit 可视化驾驶舱
-- [ ] v1.0 DevOps: Docker 容器化封装，实现一键部署
-
-
-
-# 🚀 快速开始 (Quick Start)
-
-> **注意**：本项目需要访问外部 API (DeepSeek, DuckDuckGo)，请确保网络环境畅通。
-
-## 1. 克隆仓库
-
+## 🚀 快速开始（按当前代码可运行）
+建议 Python 3.10+
+1) 安装依赖
 ```bash
-git clone https://github.com/YourUsername/deep-research-agent.git
-cd deep-research-agent
-```
-
-## 2. 配置环境
-推荐使用 Python 3.10+
-```bash
-python -m venv venv
-source venv/bin/activate          # Windows: venv\Scripts\activate
+python -m venv .venv
+# Windows
+.venv\Scripts\activate
+# macOS/Linux
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
-
-## 3. 配置 API Key
-在 config.py 或环境变量中填入你的 API Key:
-```python
-# config.py
-OPENAI_API_KEY = "sk-xxxx"
-EMBEDDING_API_KEY = "sk-xxxx"
-```
-
-## 4. 启动 MCP 服务 (新终端)
+2) 配置 `config.py`
+请填入你实际使用的 API Key（如 LLM、LangSmith 等）。
+3) 启动 MCP 搜索服务（终端 A）
 ```bash
 python tools/mcp_server_search.py
 ```
-
-## 5. 启动主程序
+默认监听：`http://localhost:8003`
+4) 启动 FastAPI 后端（终端 B）
 ```bash
-python main.py
+python server.py
 ```
+默认监听：`http://localhost:8011`  
+接口文档：`http://localhost:8011/docs`  
+聊天流接口：`POST /chat`（SSE）
+5) 启动 Streamlit 前端（终端 C）
+```bash
+cd frontend
+streamlit run app.py
+```
+
+---
+
+## 📌 当前已知限制
+复杂任务在高并发时仍可能出现长尾延迟
+batch_fetch 当前版本需要进一步完善：并发上限、总超时、异常隔离
+前后端超时参数仍在调优中（可能出现“前端先断开”）
+限流目前为内存级（重启后清零）
+
+---
+
+## 🗺️ Roadmap
+ v0.1: LangGraph 主流程打通
+ v0.2: MCP 搜索服务接入
+ v0.3: FastAPI + SSE 流式后端
+ v0.4: Streamlit 前端联调
+ v0.5: 超时治理与稳定性优化（进行中）
+ v0.6: 性能基准（成功率 / P50 / P95）
+ v0.7: Docker 一键部署与文档完善
+--- 
+
+## 🧪 Benchmark（WIP）
+后续会补充以下指标：
+
+单次研究任务成功率
+平均耗时（P50 / P95）
+抓取阶段超时率
+优化前后对比图
+
+---
+
+## 📝 Engineering Notes
+当前处于持续迭代阶段，复杂任务场景下仍在优化长尾延迟与超时治理策略。
+
+欢迎通过 Issue / PR 交流改进建议。

@@ -10,12 +10,12 @@ from langgraph.graph import MessagesState
 from loguru import logger
 
 from agents.researcher.state import Researcher
-from config import OPENAI_API_KEY, OPENAI_BASE_URL
+from config import OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_MODEL
 from state import ResearchAgent
 from tools.utils_message import clean_msg_for_deepseek
 
 llm = ChatOpenAI(
-    model="deepseek-v3.2-chat",
+    model=OPENAI_MODEL,
     api_key=OPENAI_API_KEY,
     base_url=OPENAI_BASE_URL,
     temperature=0.6
