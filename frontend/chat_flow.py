@@ -3,10 +3,20 @@ import re
 import streamlit as st
 from backend_client import stream_from_backend
 
+# 防止渲染前输出
+def looks_like_call_swarm_prefix(text):
+    if not text:
+        return False
+    t = text.upper()
+    target = "CALL_SWARM"
+    return target.startswith(t)
+
+
+# 判断是否是脏数据
 def judge_manager(text):
     if not text:
-        return ""
-    return re.search(r"(?i)\bcall_swarm\b",text)
+        return False
+    return bool(re.search(r"(?i)\bcall_swarm\b",text))
 
 
 # 清洗CALL_SWARM
@@ -85,28 +95,21 @@ def handle_chat_turn(prompt):
                             is_research = True
                             full_response = "" # 防止manager文本残留
                             final_response = ""
+                            manager_buffer = ""
+                        elif looks_like_call_swarm_prefix(manager_buffer):
+                            pass
                         else:
-                            if content:
-                                full_response += content
-                                final_response = format_sources_simple(sanitize_text(full_response))
-                                response_placeholder.markdown(final_response)
-                continue
-            elif event_type == "message": # 整段消息返回
-                if source == "writer":
-                    if content:
-                        full_response = content
-                        final_response = format_sources_simple(sanitize_text(full_response))
-                        response_placeholder.markdown(final_response)
-                elif source == "manager":
-                    # 闲聊状态输出
-                    if not is_research:
-                        manager_buffer += content or ""
-                        if judge_manager(manager_buffer):
-                            is_research = True
-                        else:
-                            full_response = content
+                            full_response += manager_buffer
+                            manager_buffer = ""
                             final_response = format_sources_simple(sanitize_text(full_response))
                             response_placeholder.markdown(final_response)
+                continue
+            elif event_type == "message": # 整段消息返回
+                # 协议兜底
+                if content and not final_response:
+                    full_response += content
+                    final_response = format_sources_simple(sanitize_text(full_response))
+                    response_placeholder.markdown(final_response)
                 continue
             elif event_type == "tool_start":
                 if not shown_waiting_text:
