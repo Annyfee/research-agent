@@ -1,18 +1,16 @@
 # 【搜索员】 负责调用工具并搜索。
-import json
 from datetime import datetime
+from loguru import logger
 
 import openai
 from langchain_core.messages import SystemMessage, HumanMessage, ToolMessage, AIMessage
-from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain_openai import ChatOpenAI
-from langgraph.graph import MessagesState
-from loguru import logger
 
 from agents.researcher.state import Researcher
 from config import OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_MODEL
-from state import ResearchAgent
 from tools.utils_message import clean_msg_for_deepseek
+
+
 
 llm = ChatOpenAI(
     model=OPENAI_MODEL,
@@ -39,9 +37,6 @@ async def surfer_node(state:Researcher,tools=None):
     stage = "深度抓取" if has_search_result else "广度搜索"
 
     logger.info(f"{prefix} 启动执行 | 阶段: {stage} | 任务: {task} (重试: {retry_count})")
-
-
-    # logger.info(f"🏄 [Surfer] 开始执行任务: {task} (重试: {retry_count})")
 
     sys_prompt = f"""你是一名专业的全网信息采集专家。
         当前任务: "{task}"
@@ -70,10 +65,8 @@ async def surfer_node(state:Researcher,tools=None):
 
 
 
-    last_tool_msg = None
     for msg in reversed(state["messages"]):
         if isinstance(msg,ToolMessage):
-            last_tool_msg = msg
             break
 
     if retry_count > 0:

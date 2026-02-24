@@ -81,7 +81,7 @@ class RAGStore:
         # 切片
         chunks = self.splitter.split_documents([raw_doc])
 
-        # --- [修复核心] 分批入库 ---
+        # --- 分批入库 ---
         # 硅基流动限制单次 batch <= 64，我们设为 50 比较安全
         batch_size = 50
         total_chunks = len(chunks)
@@ -126,16 +126,10 @@ class RAGStore:
         for i,doc in enumerate(docs):
             passages.append({"id": str(i), "text": doc.page_content, "meta": doc.metadata}) # 调用add_documents里的参数
 
-        # for i, doc in enumerate(docs):
-        #     print(doc,'\n')
-        #     print(doc.page_content,'\n')
-        #     print(doc.metadata,'\n')
-
         # 把LangChain的Document列表转换为FlashRank理解的passages列表
         rerank_request = RerankRequest(query=question, passages=passages)
         # 将数据喂给精排模型，并返回一个打分列表
         results = self.reranker.rerank(rerank_request)
-        # print(results)
 
         # Phase 3: 过滤
         final_docs = []
@@ -145,9 +139,7 @@ class RAGStore:
             if res['score'] >= score_threshold:
                 # 将FlashRank返回的py字典转化为LangChain接受的Document对象
                 doc = Document(page_content=res['text'], metadata=res['meta'])
-                # print('doc:::',doc)
                 doc.metadata['rerank_score'] = res['score']
-                # print('doc2:::',doc)
                 score.append(res['score'])
                 final_docs.append(doc)
             if len(final_docs) >= k_final:
@@ -184,7 +176,6 @@ class RAGStore:
             source = doc.metadata.get('source', 'unknown')
             score = doc.metadata.get('rerank_score', 0)
             formatted_res.append(f"[来源: {source} | 置信度: {score:.2f}]\n{doc.page_content}")
-        # print('formatted_res:::', formatted_res)
 
         return "\n\n---\n\n".join(formatted_res)
 

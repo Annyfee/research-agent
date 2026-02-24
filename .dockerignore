@@ -1,0 +1,10 @@
+.venv1/
+models/
+chroma_db/
+.env
+irrelevant_files/
+.idea/
+db/
+logs/
+__pycache__/
+*.py[cod]

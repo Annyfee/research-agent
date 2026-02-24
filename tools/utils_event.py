@@ -1,8 +1,5 @@
 
 
-
-
-
 # 把langgraph的原始事件流，统一清洗成前端可消费的标准事件格式，并且过滤掉不该展示的内容
 def parse_langgraph_event(event):
     """

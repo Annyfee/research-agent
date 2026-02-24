@@ -1,13 +1,10 @@
 # 【资料员】 整理数据:清洗数据并将其整理入库 core -> lead
 import re
-
-from langchain_core.messages import ToolMessage, HumanMessage
-from langchain_openai import ChatOpenAI
 from loguru import logger
 
+from langchain_core.messages import ToolMessage, HumanMessage
 from agents.researcher.state import Researcher
-from config import OPENAI_API_KEY
-from state import ResearchAgent
+
 from tools.registry import global_rag_store
 
 
@@ -19,7 +16,6 @@ async def core_node(state:Researcher):
     """
     # cur_task_idx = state["cur_task_idx"]
 
-    task = state["task"]
     task_idx = state["task_idx"]
     messages = state["messages"]
     last_msg = messages[-1]
@@ -44,8 +40,6 @@ async def core_node(state:Researcher):
 
         # 数据清洗
         raw_content = str(last_msg.content)
-
-        # logger.info(f"{prefix} 📥 拦截到数据 | 长度: {len(raw_content)} | 正在清洗...")
 
         cleaned = re.sub(r"!\[.*?\]\(.*?\)","",raw_content) # 去掉![]()的图片格式
         noise_keywords = ["版权所有", "©", "备案", "110报警", "营业执照", "免责声明", "出版物许可证"] # 去掉噪音
