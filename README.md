@@ -1,33 +1,49 @@
-# 🕵️ Deep Research Agent (WIP)
+<div align="center">
 
-> 基于 **LangGraph + MCP + FastAPI(SSE)** 的多智能体深度研究系统  
-> A Multi-Agent Deep Research System with graph orchestration and streaming backend.
-!Status [<sup>1</sup>](https://img.shields.io/badge/Status-Pre--Alpha-orange)
-!Python [<sup>2</sup>](https://img.shields.io/badge/Python-3.10+-blue)
-!LangGraph [<sup>3</sup>](https://img.shields.io/badge/LangGraph-StateGraph-green)
-!Protocol [<sup>4</sup>](https://img.shields.io/badge/Protocol-MCP-purple)
+# 🕵️ Deep Research Agent
+
+> 一个可在线体验的多智能体深度研究系统  
+> **LangGraph + MCP + FastAPI(SSE) + Streamlit**
+
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-annyfly.streamlit.app-red?style=for-the-badge)](https://annyfly.streamlit.app/)
+![Python](https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge)
+![LangGraph](https://img.shields.io/badge/LangGraph-StateGraph-2ea44f?style=for-the-badge)
+![FastAPI](https://img.shields.io/badge/FastAPI-SSE-009688?style=for-the-badge)
+![MCP](https://img.shields.io/badge/Protocol-MCP-purple?style=for-the-badge)
+![Frontend](https://img.shields.io/badge/Frontend-Streamlit-ff4b4b?style=for-the-badge)
+
+</div>
+
 ---
+
+## 🌐 在线体验
+
+👉 **https://annyfly.streamlit.app/**
+
+输入一个研究问题后，你可以实时看到：
+
+- 任务规划（Planner）
+- 工具调用（`web_search` / `batch_fetch`）
+- 报告写作过程（SSE 流式输出）
+- 最终结构化研究结论 + 来源引用
+
+---
+
 ## ✨ 项目亮点
-- 🧠 **Graph-native Multi-Agent**：基于 LangGraph 的可扩展状态机编排（非线性链路）
-- ⚡ **并发研究执行**：Planner 拆分任务，Researcher 子图并行搜索与抓取
-- 🔌 **MCP 工具解耦**：搜索能力服务化，Agent 与工具边界清晰
-- 🌊 **流式可观测输出**：FastAPI + SSE 实时推送 phase / token / tool 事件
-- 🖥️ **端到端可运行**：后端 API + Streamlit 前端完整打通
-- 🧩 **会话隔离能力**：`session_id` 接入主链路，支持多会话并行使用
+
+- **研究闭环**：完整的“问题 → 规划 → 检索 → 写作 → 报告”流水线
+- **输出透明**：前端可见每一步执行阶段和工具调用过程
+- **多 Agent 协作**：Manager / Planner / Researcher / Writer 职责清晰
+- **并发执行**：Researcher 子图并发运行，复杂主题处理更高效
+- **在线可用**：已部署可访问，支持真实交互体验
+
 ---
-## 📖 项目简介
-传统 LLM 对话在复杂课题上容易出现信息滞后和幻觉。  
-本项目尝试用 **多智能体 + 工具调用 + RAG** 的方式，模拟“研究团队”工作流：
-1. **Manager** 判断是闲聊还是研究任务  
-2. **Planner** 拆分可并发执行的研究子任务  
-3. **Researcher 子图** 并发搜索与网页抓取  
-4. **Core/RAG** 做清洗、切片、召回  
-5. **Writer** 汇总生成最终回答
----
-## 🧩 核心架构（当前实现）
+
+## 🧠 系统工作流
+
 ```mermaid
 graph TD
-    U[User] --> M[Manager]
+    U[User Query] --> M[Manager]
     M -->|end_chat| E[END]
     M -->|planner| P[Planner]
     P --> R1[Researcher Subgraph #1]
@@ -38,7 +54,27 @@ graph TD
     R3 --> W
     W --> E
 ```
+
 ---
+
+## 🖼️ 演示截图 / GIF
+
+### 1) 研究过程（阶段流）
+
+![pic1.png](assets/pic1.png)
+
+### 2) 工具调用过程（`web_search` / `batch_fetch`）
+
+![pic2.png](assets/pic2.png)
+
+### 3) 最终报告输出
+
+![pic3.png](assets/pic3.png)
+
+---
+
+## 🧩 项目结构
+
 ```text
 research-agent/
 ├── agents/
@@ -77,80 +113,57 @@ research-agent/
 ├── Dockerfile
 └── docker-compose.yml
 ```
+
 ---
+
+## ⚡ 快速开始
+
+本项目推荐部署方式：
+
+- 前端：Streamlit Cloud（推荐）
+- 后端：自有服务器 Docker / docker-compose
+
+
+1) 后端部署（Docker）
+```bash
+git clone https://github.com/Annyfee/research-agent.git
+cd research-agent
+cp .env.example .env
+vim .env
+# 填好后端需要的 API Key 等配置
+docker compose up -d --build
+```
+
+2) 前端部署（Streamlit Cloud，推荐）
+- Main file: frontend/app.py
+- 在 Streamlit Cloud 的 Secrets 里配置：
+```toml
+BACKEND_URL = "http://<你的服务器IP>:8011"
+```
+
+3) 本地运行前端（可选）
+如果你不是用 Streamlit Cloud，而是本地跑前端，就在 frontend/.env 配：
+```env
+BACKEND_URL=http://localhost
+```
+
+---
+
 ## 🛠️ 技术栈
-- Orchestration: LangGraph, LangChain
-- Backend API: FastAPI + SSE
-- Frontend: Streamlit
-- Tool Protocol: MCP (fastmcp)
-- Web Search / Crawl: DDGS, Trafilatura
-- RAG: ChromaDB + rerank模型（本地模型目录 models/）
-- Concurrency: asyncio
+
+- **Orchestration**: LangGraph, LangChain
+- **Backend**: FastAPI + SSE
+- **Frontend**: Streamlit
+- **Tool Protocol**: MCP (fastmcp)
+- **Search/Crawl**: DDGS, Trafilatura
+- **RAG**: ChromaDB + rerank model
+- **Runtime**: asyncio
+- **Deploy**: Docker / docker-compose
 
 ---
 
-## 🚀 快速开始（按当前代码可运行）
-建议 Python 3.10+
-1) 安装依赖
-```bash
-python -m venv .venv
-# Windows
-.venv\Scripts\activate
-# macOS/Linux
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-2) 配置 `config.py`
-请填入你实际使用的 API Key（如 LLM、LangSmith 等）。
-3) 启动 MCP 搜索服务（终端 A）
-```bash
-python tools/mcp_server_search.py
-```
-默认监听：`http://localhost:8003`
-4) 启动 FastAPI 后端（终端 B）
-```bash
-python server.py
-```
-默认监听：`http://localhost:8011`  
-接口文档：`http://localhost:8011/docs`  
-聊天流接口：`POST /chat`（SSE）
-5) 启动 Streamlit 前端（终端 C）
-```bash
-cd frontend
-streamlit run app.py
-```
+## 🤝 交流与反馈
 
----
+如果你对多智能体编排、SSE 流式交互、MCP 工具扩展有想法，欢迎提 **Issue / PR**。
 
-## 📌 当前已知限制
-复杂任务在高并发时仍可能出现长尾延迟
-batch_fetch 当前版本需要进一步完善：并发上限、总超时、异常隔离
-前后端超时参数仍在调优中（可能出现“前端先断开”）
-限流目前为内存级（重启后清零）
-
----
-
-## 🗺️ Roadmap
- v0.1: LangGraph 主流程打通
- v0.2: MCP 搜索服务接入
- v0.3: FastAPI + SSE 流式后端
- v0.4: Streamlit 前端联调
- v0.5: 超时治理与稳定性优化（进行中）
- v0.6: 性能基准（成功率 / P50 / P95）
- v0.7: Docker 一键部署与文档完善
---- 
-
-## 🧪 Benchmark（WIP）
-后续会补充以下指标：
-
-单次研究任务成功率
-平均耗时（P50 / P95）
-抓取阶段超时率
-优化前后对比图
-
----
-
-## 📝 Engineering Notes
-当前处于持续迭代阶段，复杂任务场景下仍在优化长尾延迟与超时治理策略。
-
-欢迎通过 Issue / PR 交流改进建议。
+如果这个项目对你有帮助，欢迎点个 **⭐ Star**！
