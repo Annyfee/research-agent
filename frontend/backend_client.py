@@ -1,6 +1,9 @@
 # 处理SSE协议的工具函数
 import json
+import os
 import requests
+
+BACKEND_URL = os.getenv("BACKEND_URL")
 
 
 def stream_from_backend(user_input,session_id):
@@ -8,7 +11,7 @@ def stream_from_backend(user_input,session_id):
     连接docker后端，并把复杂的数据流按SSE协议解析成简单的Py对象
     """
     # docker后端地址
-    api_url = "http://localhost:8011/chat"
+    api_url = f"{BACKEND_URL}:8011/chat"
     try:
         with requests.post(
             api_url,
@@ -51,13 +54,13 @@ def check_services_status():
         "mcp_online":False
     }
     try:
-        r = requests.get("http://localhost:8011/docs",timeout=1.5)
+        r = requests.get(f"{BACKEND_URL}:8011/docs",timeout=1.5)
         if r.status_code == 200:
             status["backend_online"] = True
     except Exception:
         status["backend_online"] = False
     try:
-        requests.get("http://localhost:8003",timeout=1.5)
+        requests.get(f"{BACKEND_URL}:8003",timeout=1.5)
         status["mcp_online"] = True
     except Exception:
         status["mcp_online"] = False
