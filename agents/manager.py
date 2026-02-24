@@ -1,13 +1,14 @@
 # 【前台】 分析话术，选择是否传递当前任务，还是判定用户在闲聊，不往后启动。
 from datetime import datetime
+from loguru import logger
 
 from langchain_core.messages import SystemMessage, AIMessage
 from langchain_openai import ChatOpenAI
-from loguru import logger
 
-from config import OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_MODEL
 from state import ResearchAgent
+from config import OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_MODEL
 from tools.utils_message import clean_msg_for_deepseek
+
 
 # llm每次初始化放在外面，避免每次连接都重新调用
 llm = ChatOpenAI(

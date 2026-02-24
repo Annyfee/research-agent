@@ -1,5 +1,3 @@
-import httpx
-import requests
 from mcp.server.fastmcp import FastMCP
 
 import asyncio
@@ -16,10 +14,6 @@ BATCH_FETCH_TIMEOUT_SEC = 90 # 批量总超时
 MAX_BATCH_CONCURRENCY = 3 # 批量并发上限
 
 
-
-# headers = {
-#     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-# }
 
 @mcp.tool()
 async def web_search(query:str):
@@ -108,4 +102,3 @@ async def batch_fetch(urls: list[str]):
 
 if __name__ == '__main__':
     mcp.run("streamable-http")
-    # mcp.run()

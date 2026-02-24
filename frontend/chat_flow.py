@@ -3,6 +3,7 @@ import re
 import streamlit as st
 from backend_client import stream_from_backend
 
+
 # 防止渲染前输出
 def looks_like_call_swarm_prefix(text):
     if not text:

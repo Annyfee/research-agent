@@ -2,8 +2,6 @@ import logging
 
 from langchain_core.messages import HumanMessage
 
-import state
-
 # --- 消音代码 --- 等级低于Warning的提示全部屏蔽
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
@@ -18,7 +16,7 @@ import asyncio
 import uuid
 
 from graph import build_graph
-from tools.stream import run_agent_with_streaming
+from irrelevant_files.stream import run_agent_with_streaming
 
 
 

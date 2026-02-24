@@ -1,23 +1,14 @@
-import uuid
-from functools import partial
-
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.constants import START, END
 from langgraph.graph import StateGraph
-from langgraph.prebuilt import ToolNode
 from langgraph.types import Send
 from loguru import logger
 
-from agents.researcher.core import core_node
 from agents.researcher.graph import build_researcher_graph
-from agents.researcher.leader import leader_node
 from agents.manager import manager_node
 from agents.planner import planner_node
-from agents.researcher.surfer import surfer_node
 from agents.writer import writer_node
 from state import ResearchAgent
-
-# from tools.registry import load_all_tools
 
 
 
@@ -59,8 +50,6 @@ async def build_graph(checkpointer=None):
     """
     组装Swarm智能体网络
     """
-    # tools = await load_all_tools()
-
     researcher_app = await build_researcher_graph()
 
     workflow = StateGraph(ResearchAgent)

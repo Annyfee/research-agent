@@ -1,11 +1,11 @@
 # 【输出员】 高质量输出:只阅读RAG来产出报告
 # 总流程: manager() -  planner(确认搜索方向) - surfer(开始搜寻) - core(数据入库) - leader(对数据做检查，是否进行第二轮检索) - writer(生成报告)
 from datetime import datetime
+from loguru import logger
 
 import openai
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from langchain_openai import ChatOpenAI
-from loguru import logger
 
 from config import OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_MODEL
 from state import ResearchAgent
