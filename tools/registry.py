@@ -10,7 +10,7 @@ from tools.rag_store import RAGStore
 
 global_rag_store = RAGStore()
 
-# [新增 3] 定义 RAG 检索工具 (给 Agent 查库用)
+# 定义 RAG 检索工具 (给 Agent 查库用)
 @tool
 def search_knowledge_base(query: str,config:RunnableConfig): # 声明使用RunnableConfig来提取我们最初定义的thread_id
     """

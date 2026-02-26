@@ -42,18 +42,33 @@
 ## 🧠 系统工作流
 
 ```mermaid
-graph TD
-    U[User Query] --> M[Manager]
-    M -->|end_chat| E[END]
-    M -->|planner| P[Planner]
-    P --> R1[Researcher Subgraph #1]
-    P --> R2[Researcher Subgraph #2]
-    P --> R3[Researcher Subgraph #3]
-    R1 --> W[Writer]
+flowchart TD
+    M[manager] -->|end_chat| END((END))
+    M --> P[planner]
+    P --> D[多Agent并发]
+
+    D --> R1[researcher 1]
+    D --> R2[researcher 2]
+    D --> RN[researcher N]
+
+    R1 --> W[writer]
     R2 --> W
-    R3 --> W
-    W --> E
+    RN --> W
+
+    W --> END
 ```
+
+```mermaid
+flowchart LR
+    S[surfer] --> C[core 判断返回质量]
+    C -->|质量过关| L[leader] --> W[writer]
+    C -->|质量不好| R{retry < 3?}
+    R -->|是| S
+    R -->|否| E[强制结束]
+```
+
+
+
 
 ---
 
