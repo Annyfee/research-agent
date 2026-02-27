@@ -52,11 +52,11 @@ async def chat_endpoint(payload:ChatRequest,request:Request): # 其中payload与
     # 返回流式响应
     return StreamingResponse(
         event_generator(graph,inputs, config,sid),
-        media_type="text/event-stream",
+        media_type="text/event-stream", # SSE流
         # 减少中间件缓冲
         headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
+            "Cache-Control": "no-cache", # 不要缓存流
+            "Connection": "keep-alive", # 保持长连接
+            "X-Accel-Buffering": "no", # 不要缓冲
         },
     )
