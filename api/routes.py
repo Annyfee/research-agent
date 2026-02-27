@@ -21,7 +21,7 @@ request_counts = defaultdict(list)
 router = APIRouter()
 # 聊天接口
 @router.post("/chat") # 前者取参数，后者取上下文
-async def chat_endpoint(payload:ChatRequest,request:Request): # 其中sid与message都是从前端的请求体接收的，这里无需做显式接收，但可使用
+async def chat_endpoint(payload:ChatRequest,request:Request): # 其中payload与message都是从前端的请求体接收的，这里无需做显式接收，但可使用
     # 获取session_id
     sid = payload.session_id or str(uuid.uuid4())
     logger.info(f"收到请求 | Session: {sid}")
