@@ -21,7 +21,5 @@ class ResearchAgent(MessagesState):
     # --- 主图业务状态 ---
     # planner 拆解出来的任务清单:
     tasks:list[str]
-    # 清洗完的数据摘要:让writer先看摘要,再决定是直接回答还是根据摘要去数据库查资料
-    research_notes:str
     # 路由指针:下一步指向什么节点(与子图命名分开)
     main_route:str
