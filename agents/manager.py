@@ -92,4 +92,4 @@ async def manager_node(state:ResearchAgent):
             }
         logger.error(f"Manager 决策异常: {e}")
         # 遇到错误保守起见，当做闲聊处理，避免死循环
-        return {"next_node": "end_chat","messages":[AIMessage(content="⚠️ 系统暂时异常，请稍后重试。")]}
+        return {"main_route": "end_chat","messages":[AIMessage(content="⚠️ 系统暂时异常，请稍后重试。")]}

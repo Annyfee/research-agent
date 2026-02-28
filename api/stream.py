@@ -98,7 +98,7 @@ def adapt_event_for_ui(data:dict,fsm_state:dict,run_id:str,sid:str):
 # 流式输出
 async def event_generator(graph,inputs:dict,config:dict,sid:str):
     """
-    负责将LangGraph事件转换为SSE数据流
+    翻译层 | 将LangGraph事件转换为SSE数据流
     """
     # 限制最大并发数
     async with MAX_CONCURRENT_USERS:
@@ -107,7 +107,7 @@ async def event_generator(graph,inputs:dict,config:dict,sid:str):
             fsm_state = {"phase": None}
             async with asyncio.timeout(GRAPH_RUN_TIMEOUT_SEC):
                 # 启动Graph流式执行 - 这里只负责丢数据，展示什么数据(如on_tool_start)由前端来管
-                async for event in graph.astream_events(inputs,config,version="v2"):
+                async for event in graph.astream_events(inputs,config,version="v2"):# 产出原始事件
                     data = parse_langgraph_event(event)
                     ui_events = adapt_event_for_ui(data,fsm_state,run_id,sid)
                     for data in ui_events:
