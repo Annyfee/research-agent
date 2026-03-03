@@ -2,7 +2,7 @@
 import re
 from loguru import logger
 
-from langchain_core.messages import ToolMessage, HumanMessage
+from langchain_core.messages import ToolMessage, HumanMessage, AIMessage
 from agents.researcher.state import Researcher
 
 from tools.registry import global_rag_store
@@ -83,7 +83,7 @@ async def core_node(state:Researcher):
             }
 
     # 对来自surfer的报警强制拦截并交给Leader
-    if isinstance(last_msg,HumanMessage) and "[FATAL_ERROR]" in str(last_msg.HumanMessage):
+    if isinstance(last_msg,AIMessage) and "[FATAL_ERROR]" in str(last_msg.content):
         logger.error(f"{prefix} 接收到致命错误信号，强制熔断至 Leader。")
         return {
             "next_node":"leader"
