@@ -14,12 +14,14 @@ services:
     ports:
       - "8011:8011"
 
-    # 数据挂载 - 数据持久化:左边是宿主机，右边是容器内部 二者数据永远会实时同步，以防出现容器内部文件丢失造成文件丢失的情况
+    # 数据挂载 - 数据持久化:左边是宿主机，右边是容器内部 二者数据永远会实时同步，以防出现容器内部文件丢失造成文件丢失的情况 -- 挂载后的文件只需docker-compose up 无需--build
     volumes:
-      - ./db:/app/db
-      - ./logs:/app/logs
-      - ./models:/app/models
-      - ./chroma_db:/app/chroma_db
+      # 映射文件
+      - .:/app
+      # 保护容器内的大文件/依赖 防止主机内容器为空覆盖
+      - /app/.venv1
+      - /app/models
+      - /app/chroma_db
     env_file:
       - .env
 
